@@ -1,0 +1,190 @@
+<!doctype html>
+{% load static %}
+<html lang="en">
+<head>
+    <title>LINEX - LipidNetworkExplorer</title>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Bootstrap css -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+
+    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <script type="text/javascript" charset="utf8" src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+    <script type="text/javascript" charset="utf8" src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.15.0/umd/popper.min.js" ></script>
+    <script type="text/javascript" charset="utf8" src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+
+    <!--Get sortable tables rendering -->
+    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.19/js/jquery.dataTables.min.js"></script>
+    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.19/js/dataTables.bootstrap4.min.js"></script>
+
+    <!-- get export optios for datatables -->
+    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/buttons/1.5.6/js/dataTables.buttons.min.js"></script>
+    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/buttons/1.5.6/js/buttons.flash.min.js"></script>
+    <script type="text/javascript" charset="utf8" src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/buttons/1.5.6/js/buttons.html5.min.js"></script>
+
+    <!-- datatables and export button styling -->
+    <!-- either bootstrap or jquery styling, but not both -->
+    <!-- <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.18/css/jquery.dataTables.bootstrap4.min.css">-->
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.19/css/jquery.dataTables.min.css" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/buttons/1.5.6/css/buttons.dataTables.min.css" />
+
+    <!-- Get Glyphocons from fontawesome-->
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.13.0/css/all.css">
+
+    <!-- Nicht sichtbar??-->
+    <link rel="shortcut icon" type="image/png" href="{% static 'images/icon.png' %}"/>
+    <link rel="icon" type="image/png" href="{% static 'images/icon.png' %}"/>
+
+    {% block head %}
+    {% endblock %}
+
+    {% block style %}
+    {% endblock %}
+    <style>
+        .container {
+            height: 90vh;
+            border-style: solid;
+            border-width: 2px;
+            border-color: #005293ff;
+            border-radius: 7px;
+            background-color: white;
+            margin-top: 75px;
+            margin-left: auto;
+        }
+
+        .upload-container {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .inner-upload {
+            flex-direction: column;
+            overflow: auto;
+            border-radius: 7px;
+            padding-top: 25px;
+            padding-right: 15px;
+            padding-left: 15px
+        }
+
+        .footer {
+            /* add border? */
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            height: 50px;
+            line-height: 50px;
+            padding-left: 15px;
+        }
+        button {
+              background-color: #4CAF50; /* Green */
+              border: none;
+              color: white;
+              padding: 10px 20px;
+              text-align: center;
+              text-decoration: none;
+              display: inline-block;
+              font-size: 16px;
+              margin: 4px 2px;
+              transition-duration: 0.4s;
+              cursor: pointer;
+              border-radius: 7px;
+        }
+
+        button {
+              background-color: white;
+              color: black;
+              border: 2px solid #555555;
+        }
+
+        button:hover {
+              background-color: #555555;
+              color: white;
+        }
+
+        .button-green {
+              background-color: white;
+              color: black;
+              border: 2px solid #4CAF50;
+        }
+
+        .button-green:hover {
+              background-color: #4CAF50;
+              color: white;
+        }
+
+        div::-webkit-scrollbar {
+            width: 10px;
+        }
+        div::-webkit-scrollbar-track {
+            background-color: #9993 !important;
+        }
+        div::-webkit-scrollbar-thumb {
+            background-color: #9999 !important;
+        }
+
+    </style>
+</head>
+
+<body style="background-color: #ededeeff">
+<nav class="navbar navbar-expand-sm navbar-dark py-0 fixed-top" style="background-color: #0065bd;">
+  <a class="navbar-brand text-light" href="{% url 'index' %}">
+            <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAB8lBMVEX////m5ua5ubnk5OT9/f2bm5uKior39/fW1tZzc3PNzc26uro6OjqysrL8/Px7e3tlZWX09PTJyclGRka9vb03Nzevr6+3t7erq6v5+fnIyMizs7Pn5+fr6+v4+Pjh4eGamprb29u2trYzMzOurq5eXl5ERETy8vJtbW0qKiqWlpagoKC+vr4eHh4sLCxDQ0MkJCSjo6PGxsa7u7sdHR20tLQmJiaqqqpsbGwyMjKmpqYgICCUlJTe3t7w8PAlJSWxsbHLy8uXl5fAwMCwsLAaGhotLS21tbVfX19AQEAoKCiPj4+ZmZnZ2dmSkpKQkJDY2Ng1NTXS0tLg4OBramk3NjXu9PrO4fLN4fLP4vLz9/v5+/1yg5JKXm/B1OXO4vOy0OsgeMUfd8QofcfJ3vHn8Pg6h8scdcMed8QiecWz0evb6fWVv+M3hssvgcmTvuNkodYbdcPF3PDm7/gtgMhLktCYweRFjs4ke8aNuuFxqdoXc8Kuzur6/P1VmNL4+v2kyOccdcQsf8h4rdxsptkzhMrs9Pq71u0adMO00uvR4/MpfsdSltJCjM6jx+cQb8EqfscugckQbsB3rdtqpdgwgcns8/q61e0WcsKtzen8/f6YwOSOuuHI3fBvqNlup9ltp9mmyeeDtN70+PzW5vR0q9pIvOTMAAAAAWJLR0QAiAUdSAAAAAlwSFlzAAAXEgAAFxIBZ5/SUgAAAAd0SU1FB+UKEw0kKqDKe2IAAAEnSURBVDjLY2AYToCRiZmBgYWVjR3C5eDkQlPAzcPLwMDHLyAI4QoJi6ArEBUDmiAuISklLSMrxyCvoIimQElZBWiCqpq6hqaWNre6jq4YugI9CZACfXUNA0NuLSNjE3QFpmbmEAUWlowsVrxKGAp4rW3kbe1AJtg7ODo5c2MocHE10HNz9/BU1/Dy9hGTFXFVQVPg6+fv7R/gbiVpERgkr84QbOOLK8RCQmWxioeFRwBBZFR0TGxcPJAVHoamICExMTEpKTklNS09A8TKzEJTkJ2Tm5dfUFhUXFJaVl5RWVVdg25HbV15fUNjUXFTM0NLa1t7x4ApKOzs6sapoKe3vq9/wsRJkxmmTJ02fcZMdAWzZs+pnTtv/vwFNQwLFy1esjScYTgBAKc1ZVdSQNMbAAAAJXRFWHRkYXRlOmNyZWF0ZQAyMDIxLTEwLTE5VDExOjM2OjQyKzAyOjAwSbcFBAAAACV0RVh0ZGF0ZTptb2RpZnkAMjAyMS0xMC0xOVQxMTozNjo0MiswMjowMDjqvbgAAAAZdEVYdFNvZnR3YXJlAHd3dy5pbmtzY2FwZS5vcmeb7jwaAAAAAElFTkSuQmCC" alt="logo" height="32">
+</a>
+  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarTogglerDemo02" aria-controls="navbarTogglerDemo02" aria-expanded="false" aria-label="Toggle navigation">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+
+  <div class="collapse navbar-collapse" id="navbarTogglerDemo02">
+      {% if not to_string %}
+    <ul class="navbar-nav mr-auto my-2">
+      <li class="nav-item active">
+        <a class="nav-link" href="{% url 'index' %}"><i class="fa fa-home fa-fw" aria-hidden="true"></i>&nbsp;LINEX Home</a>
+      </li>
+      <li class="nav-item active">
+        <a class="nav-link" href="{% url 'upload' %}"><i class="fa fa-upload fa-fw" aria-hidden="true"></i>&nbsp;Upload</a>
+      </li>
+      <li class="nav-item active">
+        <a class="nav-link" href="{% url 'analysis' %}"><i class="fa fa-project-diagram fa-fw" aria-hidden="true"></i>&nbsp;Analysis</a>
+      </li>
+        <li class="nav-item active">
+        <a class="nav-link" href="{% url 'download' %}"><i class="fa fa-download fa-fw" aria-hidden="true"></i>&nbsp;Download </a>
+      </li>
+        <li class="nav-item active">
+        <a class="nav-link" href="{% url 'tutorial' %}"><i class="fa fa-chalkboard-teacher fa-fw" aria-hidden="true"></i>&nbsp;Tutorial </a>
+      </li>
+        <li class="nav-item active">
+        <a class="nav-link" href="{% url 'request-data-delete' %}"><i class="fa fa-trash-alt fa-fw" aria-hidden="true"></i>&nbsp;Delete Data </a>
+      </li>
+        <li class="nav-item active">
+        <a class="nav-link" href="{% url 'user-contribution' %}"><i class="fa fa-comment-dots fa-fw" aria-hidden="true"></i>&nbsp;Contribute </a>
+      </li>
+    </ul>
+      <ul class="navbar-nav my-2">
+      <li class="nav-item active">
+        <a class="nav-link" href="{% url 'about' %}"><i class="fa fa-info-circle fa-fw" aria-hidden="true"></i>&nbsp;About</a>
+      </li>
+    </ul>
+      <div>
+          <img src="data:image/png;base64,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" alt="Logo" style="width: auto; height: 32px; padding-left: 15px"/>
+      </div>
+      {% else %}
+          <img src="data:image/png;base64,{{ logo }}" alt="Logo" style="width: auto; height: 35px; margin-left: 45%"/>
+          <ul class="navbar-nav my-2" style="margin-right: 1%; margin-left: auto">
+          <li class="nav-item active">
+            <a class="nav-link" href="https://exbio.wzw.tum.de/linex"><i class="fa fa-info-circle fa-fw" aria-hidden="true"></i>&nbsp;Visit the LINEX website</a>
+          </li>
+          </ul>
+      {% endif %}
+  </div>
+</nav>
+
+
+{% block body %}
+{% endblock %}
+
+</body>
+
+</html>

@@ -1,0 +1,55 @@
+{% extends 'lipid_network/base.html' %}
+{% load static %}
+
+{% block body %}
+<div class="container upload-container">
+    <div class="inner-upload">
+        <h2><i class="fa fa-comments fa-fw" aria-hidden="true"></i>&nbsp;Contact</h2>
+        <p> For support issues or suggestions on how to improve LINEX, please open an issue or contact: <br>
+            nikolai.koehler[a.t_)cos.uni-heidelberg.de <br>
+            josch.pauling[a.t_)ukdd.de </p>
+
+        <h2><i class="fa fa-file-alt fa-fw" aria-hidden="true"></i>&nbsp;Citation</h2>
+
+        <p> Please cite one of the following papers if you use LINEX: <br>
+            <ul>
+            <!-- UPDATE PUBLICATIONS ALSO ON DOWNLOAD & UPLOAD PAGE -->
+                <li>
+                    LINEX<sup>2</sup>: <a href="https://doi.org/10.1093/bib/bbac572">Rose and Köhler et al.
+                    <b>Lipid network and moiety analysis for revealing enzymatic dysregulation and mechanistic alterations from lipidomics data</b>.
+                    <i>Briefings in Bioinformatics</i> <b>2023</b>, bbac572</a> <br>
+                </li>
+                <li> LINEX: <a href="https://doi.org/10.3390/metabo11080488">Köhler and Rose et al. <b>Investigating Global Lipidome Alterations with the Lipid Network Explorer</b>.
+                    <i>Metabolites</i> <b>2021</b>, 11, 488</a> <br>
+                </li>
+
+            </ul>
+        </p>
+
+        <h2><i class="fab fa-python" aria-hidden="true"></i>&nbsp;Code</h2>
+        <p>LINEX is free software under the <a href="https://www.gnu.org/licenses/agpl-3.0.en.html">aGPL v3</a> license.</p>
+        <p>If you want to inspect the code or run LINEX locally on your computer check out the <a href="https://github.com/lipitum/linex">git repository</a>.</p>
+        <p>Currently deployed version: {{ linex_version }}</p>
+        <h2><i class="fa fa-building" aria-hidden="true"></i>&nbsp;Impressum</h2>
+        <p>Dr. Josch K. Pauling <br>
+            <a href="https://lipitum.de/"> bidt Junior Research Group LipiTUM </a> <br>
+            Chair of Experimental Bioinformatics <br>
+            TUM School of Life Sciences Weihenstephan <br>
+            Maximus-von-Imhof-Forum 3 <br>
+            85354 Freising <br>
+            Germany </p>
+        <h2><i class="fas fa-cookie" aria-hidden="true"></i>&nbsp;Cookies & Disclaimer</h2>
+        <p>We provide LINEX without any warranty.
+            You are using LINEX at your own risk.
+            Uploaded data is processed on our servers and saved until manually deleted by you or automatically after a certain time.
+	    For further information, please see the <a href="{% url 'request-data-delete' %}">Delete Data</a> page.
+            We are using cookies, to safely connect your browser session to your uploaded data.
+            No personalized information about you is stored and cookies are automatically invalidated after {{ timeout }} minutes.
+	    We recommend to <a href="{% url 'request-data-delete' %}">delete your data</a> manually after using LINEX.
+            While we are doing our best to protect your uploaded data while it is processed on our server, we cannot give any warranties.
+            If you have sensitive data, we recommend to run LINEX locally on your computer (no programming knowledge required).
+            Have a look at the <b>Code</b> section on this page for the git repository containing installation instructions and further details.
+        </p>
+    </div>
+</div>
+{% endblock %}

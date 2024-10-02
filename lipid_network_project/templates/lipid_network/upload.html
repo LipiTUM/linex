@@ -1,0 +1,245 @@
+{% extends 'lipid_network/base.html' %}
+
+{% block head %}
+    <style>
+        .data-fields {
+            float: left;
+            overflow-x: hidden;
+            width: 40%;
+        }
+        /* collapsibles */
+        [data-toggle="collapse"] .fa:before {
+            content: "\f139";
+        }
+
+        [data-toggle="collapse"].collapsed .fa:before {
+            content: "\f13a";
+        }
+    </style>
+{% endblock %}
+
+
+{% block body %}
+<!-- List of uploaded documents -->
+<div class="container upload-container">
+    <div class="inner-upload">
+        <h1><i class="fa fa-upload fa-fw" aria-hidden="true"></i>&nbsp;
+            Upload
+            {% if upload_version == 1 %}
+                for Version 1
+            {% elif upload_version == 2%}
+                for Version 2
+            {% endif %}
+        </h1>
+        {% if upload_version == 0 or upload_version > 2 %}
+            <h2>Please select your desired LINEX version</h2>
+            <p style="color: #b40e0e"><b>{{ message }}</b></p>
+            <div>
+
+                <!-- UPDATE PUBLICATIONS ALSO ON ABOUT & DOWNLOAD  PAGE -->
+
+                <div style="width: 30%; margin-top: 10%; margin-left: 10%; margin-right: 10%; float: left; height:40vh; position: relative">
+                    <div style="text-align: center">
+                        <p>
+                            Use LINEX as published in <a href="https://doi.org/10.3390/metabo11080488">Köhler and Rose et al. <b>Investigating Global Lipidome Alterations with the Lipid Network Explorer</b>.
+                            <i>Metabolites</i> <b>2021</b>, 11, 488</a>
+                        </p>
+                        <p>
+                            Fully customizable metabolic rules & visualizations.
+                        </p>
+                    </div>
+                    <a href="{% url 'upload' %}?version=1">
+                    <button style="width: 75%; height: 10vh; font-size: 35pt; position: absolute; bottom: 0; margin-left: 12%">
+                        LINEX
+                    </button>
+                </a>
+                </div>
+                <div style="width: 30%; margin-top: 10%; margin-left: 10%; margin-right: 10%; float: left; height:40vh; position: relative">
+                    <div style="text-align: center">
+
+                        <!-- UPDATE PUBLICATIONS ALSO ON ABOUT & DOWNLOAD  PAGE -->
+
+                        <p>Use LINEX<sup>2</sup> as published in <a href="https://doi.org/10.1093/bib/bbac572">Rose and Köhler et al.
+                    <b>Lipid network and moiety analysis for revealing enzymatic dysregulation and mechanistic alterations from lipidomics data</b>.
+                    <i>Briefings in Bioinformatics</i> <b>2023</b>, bbac572</a>
+                        </p>
+                        <p>
+                            Lipid reactions from the Rhea and Reactome database, Lipid-Enzyme reaction networks &
+                            a novel network enrichment method to find dysregulated lipid modules.
+                        </p>
+                    </div>
+                    <a href="{% url 'upload' %}?version=2">
+                    <button  class="button button-green" style="width: 75%; height: 10vh; font-size: 35pt; position: absolute; bottom: 0; margin-left: 12%">
+                        LINEX<sup>2</sup>
+                    </button>
+                    </a>
+
+                </div>
+            </div>
+
+
+            </div>
+        {% else %}
+            <p><b>NOTE: You can only have one data set per session uploaded.</b><br>If you want to analyse multiple datasets please download the current one before uploading a new one.</p>
+            <!-- TODO: help text into hoverable info -->
+        {% if upload_version == 2 %}
+            <div style="text-align: center;">
+                <button onclick="window.location.href='{% url 'upload' %}?exampledata=1'" class="button" style="text-align:center">Try with example data</button>
+                <p>(Example data from <a href="https://doi.org/10.1016/j.bbalip.2019.158579">Wang et al. (2020)
+                    "Shotgun lipidomics-based characterization of the landscape of lipid metabolism in colorectal cancer"</a>)
+                </p>
+                <hr>
+            </div>
+        {% endif %}
+            <form action="{% url 'upload' %}" method="post" enctype="multipart/form-data">
+                <div class="data-fields">
+                    {% csrf_token %}
+                    <p style="color: #b40e0e"><b>{{ message }}</b>
+                    {% if pending_link %}
+                        <a href="{% url 'upload-pending' %}">Check the status here.</a>
+                        <br>
+                    {% endif %}
+                    </p>
+                    <!-- data section -->
+                    <h3>Required Input Data</h3>
+                    {{ data_form.version_number }}
+                    <script>
+                        document.getElementById('id_version_number').selectedIndex = {{ upload_version }} - 1;
+                        document.getElementById('id_version_number').style.display = "none";
+                    </script>
+                    {{ data_form.lipids_as_columns }} {{ data_form.lipids_as_columns.label }}
+                    <p>{{ data_form.non_field_errors }}</p>
+                    <p>{{ data_form.docfile.label_tag }} {{ data_form.docfile.help_text }}</p>
+                    <p>{{ data_form.docfile.errors }} {{ data_form.docfile }}</p>
+                    <hr>
+                    {% if upload_version == 1 %}
+                    <h4>Optional Sample Data</h4>
+                    {% else %}
+                     <h4>Sample Data</h4>
+                    {% endif %}
+                    <p>{{ data_form.group_docfile.label_tag }} {{ data_form.group_docfile.help_text }}</p>
+                    <p>{{ data_form.group_docfile.errors }} {{ data_form.group_docfile }}</p>
+                    <hr>
+                    <!-- optional lipid_class and fatty_acid settings  -->
+                    <h4>Optional Model Settings</h4>
+                    <p>{{ data_form.fa_file.label_tag }} {{ data_form.fa_file.help_text }}</p>
+                    <p>{{ data_form.fa_file.errors }} {{ data_form.fa_file }}</p>
+                    <p>
+                        The default settings can be downloaded
+                        <a href="https://github.com/lipitum/linex2_package/-/raw/master/linex2/data/default_fatty_acids.txt?inline=false"
+                           download="default_fatty_acids.txt">here
+                        </a>
+                    </p>
+                    {%  if upload_version == 1 %}
+                    <p>{{ data_form.class_file.label_tag }} {{ data_form.class_file.help_text }}</p>
+                    <p>{{ data_form.class_file.errors }} {{ data_form.class_file }}</p>
+                    {% endif %}
+                    {%  if upload_version == 2 %}
+                    <h4>Optional confirmed species</h4>
+                    <p>Confirmed molecular species for quantified sum species in the data.</p>
+                    <p>{{ data_form.confirmed_species_file.label_tag }} {{ data_form.confirmed_species_file.help_text }}</p>
+                    <p>{{ data_form.confirmed_species_file.errors }} {{ data_form.confirmed_species_file }}</p>
+                    {% endif %}
+                    <hr>
+
+                    <!-- TODO: move button outside of collapsible -->
+                    <button type="submit" style="margin-top: 10%" class="button button-green">Upload & Compute Network</button>
+                </div>
+                <div style="float: left; padding-left: 5%; width: 60%">
+                    <h4>Computation Options</h4>
+                    <!-- data processing
+                        * lynx options
+                        * lipid level => not for version 2
+                        * logged data
+                        * log-ratios/'normal' fold-changes
+                    -->
+                    {% for field in data_process %}
+                        <div id="{{ field.label }}_abcd" style="padding-top: 10px; padding-bottom: 10px">
+                            {{ field.errors }}
+                            {{ field }} {{ field.label }}
+                            {% if field.help_text %}
+                                <p>{{ field.help_text|safe }}</p>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                    <hr>
+                    {%  if upload_version == 2 %}
+                        <script>
+                            document.getElementById('Lipid Resolution_abcd').style.display = "none";
+                        </script>
+                        {%  for field in version2specific %}
+                            <div style="padding-top: 10px; padding-bottom: 10px">
+                                {{ field.errors }}
+                                <!-- TODO: switch depending on field/widget type -->
+                                {{ field }} {{ field.label }}
+                                {% if field.help_text %}
+                                    <p>{{ field.help_text|safe }}</p>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                        <hr>
+                    {%  endif %}
+                    <!-- statistics
+                        * fold-changes
+                        * reference group
+                        * correlations
+                        * partial-correlations
+                        * pcor-solver
+                        * binary test
+                        * test-type
+                    -->
+                    <!-- TODO: add solver options for pcors -->
+                    <div class="accordion" id="statsTab">
+                        <div class="card">
+                            <div class="card-header" id="headingStats">
+                                <h5 class="mb-0">
+                                    <button class="btn btn-link" type="button" data-toggle="collapse"
+                                            data-target="#statsOpts" aria-expanded="true" aria-controls="statsOpts"
+                                            style="color: #595959; font-size: 14pt">
+                                        <i class="fa" aria-hidden="true"></i> Statistics and Network Options
+                                    </button>
+                                </h5>
+                            </div>
+                            <div id="statsOpts" class="collapse show" aria-labelledby="headingStats"
+                                 data-parent="#statsTab">
+                                <div class="card-body">
+                                    {% for field in statistics %}
+                                    <div style="padding-top: 10px; padding-bottom: 10px">
+                                        {{ field.errors }}
+                                        {{ field }} {{ field.label }}
+                                        {% if field.help_text %}
+                                        <p>{{ field.help_text|safe }}</p>
+                                        {% endif %}
+                                    </div>
+                                    {% endfor %}
+                                    <!-- network options => move into one of the above?
+                                        * directed => not for version 2
+                                    -->
+                                    {% for field in netopt %}
+                                    <div style="padding-top: 10px; padding-bottom: 10px">
+                                        {{ field.errors }}
+                                        {{ field }} {{ field.label }}
+                                        {% if field.help_text %}
+                                        <p>{{ field.help_text|safe }}</p>
+                                        {% endif %}
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        <script>
+                            $('.collapse').collapse()
+                        </script>
+                    </div>
+                </div>
+            </form>
+        {% endif %}
+    </div>
+    {% if upload_version > 0 and upload_version < 3 %}
+    <script>
+        document.getElementById("id_corr_sig").step = 0.001;
+    </script>
+    {% endif %}
+</div>
+
+{% endblock %}

@@ -1,0 +1,298 @@
+{% extends 'lipid_network/base.html' %}
+
+{% block style %}
+    <style>
+        .box {
+            padding: 20px;
+            margin: 20px;
+            border: 1px solid #ccc;
+        }
+
+        .slow-spin {
+            -webkit-animation: fa-spin 2s infinite linear;
+            animation: fa-spin 1.5s infinite linear;
+        }
+    </style>
+    {% load static %}
+    <script type="text/javascript" src="{% static '/js/download_utils.js' %}"></script>
+    <script>
+        let progress;
+        {% if version == 2 %}
+        let ids = ['reading', 'lynx', 'class_init', 'compute_network', 'compute_statistics',
+                   'compute_views', 'compute_summaries'];
+        {% else %}
+        let ids = ['reading', 'lynx', 'class_init', 'compute_network', 'compute_statistics', 'compute_views'];
+        {% endif %}
+        let idText = {
+            'reading': 'Loading Data: ',
+            'lynx': 'Lynx Progress: ',
+            'class_init': 'Class init: ',
+            'compute_network': 'Compute Network: ',
+            'compute_statistics': 'Compute Statistics: ',
+        {% if version == 2 %}
+            'compute_views': 'Compute Views: ',
+            'compute_summaries': 'Compute Summary: '
+        {% else %}
+            'compute_views': 'Compute Views: '
+        {% endif %}
+        };
+
+        function getProgress() {
+			let request = new XMLHttpRequest();
+			request.onreadystatechange = function () {
+			    if (request.readyState === 4 && request.status === 200) {
+			        progress = JSON.parse(request.responseText);
+                }
+            };
+			request.open('POST', '{% url "upload-pending" %}', true);
+			let csrftoken = getCookie('csrftoken');
+			request.setRequestHeader("X-CSRFToken", csrftoken);
+			request.setRequestHeader('Content-Type', 'application/json');
+			request.send();
+        }
+
+        function updateStep() {
+            let i, id, elem;
+            for (i = 0; i < ids.length; i++) {
+                id = ids[i];
+                elem = document.getElementById(id);
+                if (progress[id] === 'Waiting') {
+                    if (id === 'reading') {
+                        elem.innerHTML = idText[id] + '<i class="fas fa-hourglass" style="color: #0065bd;"></i> Waiting in queue...';
+                    } else {
+                        elem.innerHTML = idText[id] + '<i class="fas fa-hourglass" style="color: #0065bd;"></i>';
+                    }
+                } else if (progress[id] === 'Done') {
+                   elem.innerHTML =  idText[id] + '<i class="fas fa-check" style="color: green;"></i>';
+                } else if (progress[id] === 'In Progress') {
+                    elem.innerHTML = idText[id] + '<i class="fa fa-spinner slow-spin fa-fw" style="color: #0065bd;"></i>';
+                } else if (progress[id] === 'Failed') {
+                    elem.innerHTML = idText[id] + '<i class="fa fa-times" style="color: #b40e0e;"></i>';
+                }
+            }
+            if (progress['warning'] !== undefined) {
+                document.getElementById('warning').hidden = false;
+                document.getElementById('warning').innerHTML = '';
+                for (i = 0; i < progress['warning'].length; i++) {
+                    document.getElementById('warning').innerHTML = document.getElementById('warning').innerHTML + '<br>' + progress['warning'][i];
+                }
+            }
+            if (progress['error']) {
+                document.getElementById('error').hidden = false;
+                document.getElementById('error').innerHTML = progress['message'];
+            }
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function updateProgress() {
+            // initialising progress variable
+            let max_tries = 20;
+            let i = 0;
+            while (progress === undefined && i < max_tries) {
+                await sleep(500);
+                getProgress();
+                i++;
+            }
+            if (progress === undefined) {
+                console.warn('progress data could not be fetched')
+                document.getElementById('note').hidden = false;
+                return;
+            }
+            while (!(progress['error'] || progress['done'])) {
+                await sleep(1500);
+                // updating html elements
+                updateStep();
+                // updating progress variable
+                getProgress();
+                if (progress['unconverted'] && document.getElementById("unconverted") === null) {
+                    window.location.reload();
+                }
+            }
+            if (progress['error']) {
+                // stopping current animations and indicating where the error happened
+                for (const [step, status] of Object.entries(progress)) {
+                    if (status === "In Progress") {
+                        document.getElementById(step).innerHTML = idText[step] +
+                            '<i class="fas fa-times" style="color: #b40e0e;"></i>';
+                    }
+                }
+            } else {
+                // showing success message + analysis page link
+                document.getElementById('done').hidden = false;
+                document.getElementById('view_results').hidden = false;
+            }
+        }
+    </script>
+{% endblock %}
+
+{% block body %}
+<div class="container upload-container">
+    <div class="inner-upload">
+        <div style="float: left; width: 100%">
+            {% if pending %}
+                {% if progress.groups %}
+                    <h3><i class="fa fa-project-diagram fa-fw" style="color:  #0065bd;" aria-hidden="true"></i>Computation with groups</h3>
+                {% else %}
+                    <h3><i class="fa fa-project-diagram fa-fw" style="color:  #0065bd;" aria-hidden="true"></i>Computation without groups</h3>
+                {% endif %}
+                <p style="margin-bottom: 40px; margin-top: 15px" id="note" hidden><b>NOTE:</b> please reload frequently to see progress (automatic reloading not possible)</p>
+                <p id="reading" style="padding-top: 50px">
+                    Loading Data:
+                    {% if progress.reading == "Waiting" %}
+                        <i class="fas fa-hourglass" style="color: #0065bd;"></i> Waiting in queue...
+                    {% elif progress.reading == "Done" %}
+                        <i class="fas fa-check" style="color: green;"></i>
+                    {% elif progress.reading == "In Progress" %}
+                        <i class="fa fa-spinner slow-spin fa-fw" style="color: #0065bd"></i>
+                    {% elif progress.reading == "Failed" %}
+                        <i class="fas fa-times" style="color: #b40e0e;"></i>
+                    {% endif %}
+                </p>
+                <p id="lynx">
+                    Lynx Progress:
+                    {% if progress.lynx == "Waiting" %}
+                        <i class="fas fa-hourglass" style="color: #0065bd;"></i>
+                    {% elif progress.lynx == "Done" %}
+                        <i class="fas fa-check" style="color: green;"></i>
+                    {% elif progress.lynx == "In Progress" %}
+                        <i class="fa fa-spinner slow-spin fa-fw" style="color: #0065bd"></i>
+                    {% elif progress.lynx == "Failed" %}
+                        <i class="fas fa-times" style="color: #b40e0e;"></i>
+                    {% endif %}
+                </p>
+                <p id='class_init'>
+                    Class init:
+                    {% if progress.class_init == "Waiting" %}
+                        <i class="fas fa-hourglass" style="color: #0065bd;"></i>
+                    {% elif progress.class_init == "Done" %}
+                        <i class="fas fa-check" style="color: green;"></i>
+                    {% elif progress.class_init == "In Progress" and not progress.error%}
+                        <i class="fa fa-spinner slow-spin fa-fw" style="color: #0065bd;"></i>
+                    {% elif progress.class_init == "Failed" %}
+                        <i class="fas fa-times" style="color: #b40e0e;"></i>
+                    {% elif progress.class_init == "In Progress" and progress.error%}
+                        <i class="fas fa-times" style="color: #b40e0e;"></i>
+                    {% endif %}
+                </p>
+                <p id="compute_network">
+                    Compute Network:
+                    {% if progress.compute_network == "Waiting" %}
+                        <i class="fas fa-hourglass" style="color: #0065bd;"></i>
+                    {% elif progress.compute_network == "Done" %}
+                        <i class="fas fa-check" style="color: green;"></i>
+                    {% elif progress.compute_network == "In Progress" and progress.error%}
+                        <i class="fas fa-times" style="color: #b40e0e;"></i>
+                    {% elif progress.compute_network == "In Progress" %}
+                        <i class="fa fa-spinner slow-spin fa-fw" style="color: #0065bd;"></i>
+                    {% endif %}
+                </p>
+                <p id="compute_statistics">
+                    Compute Statistics:
+                    {% if progress.compute_statistics == "Waiting" %}
+                        <i class="fas fa-hourglass" style="color: #0065bd;"></i>
+                    {% elif progress.compute_statistics == "Done" %}
+                        <i class="fas fa-check" style="color: green;"></i>
+                    {% elif progress.compute_statistics == "In Progress" and progress.error%}
+                        <i class="fas fa-times" style="color: #b40e0e;"></i>
+                    {% elif progress.compute_statistics == "In Progress" %}
+                        <i class="fa fa-spinner slow-spin fa-fw" style="color: #0065bd;"></i>
+                    {% endif %}
+                </p>
+                <p id="compute_views">
+                    Compute Views:
+                    {% if progress.compute_views == "Waiting" %}
+                        <i class="fas fa-hourglass" style="color: #0065bd;"></i>
+                    {% elif progress.compute_views == "Done" %}
+                        <i class="fas fa-check" style="color: green;"></i>
+                    {% elif progress.compute_views == "In Progress" and progress.error%}
+                        <i class="fas fa-times" style="color: #b40e0e;"></i>
+                    {% elif progress.compute_views == "In Progress" %}
+                        <i class="fa fa-spinner slow-spin fa-fw" style="color: #0065bd;"></i>
+                    {% endif %}
+                {% if version == 2 %}
+                <p id="compute_summaries">
+                    Compute Summaries:
+                    {% if progress.compute_summaries == "Waiting" %}
+                        <i class="fas fa-hourglass" style="color: #0065bd;"></i>
+                    {% elif progress.compute_summaries == "Done" %}
+                        <i class="fas fa-check" style="color: green;"></i>
+                    {% elif progress.compute_summaries == "In Progress" and progress.error%}
+                        <i class="fas fa-times" style="color: #b40e0e;"></i>
+                    {% elif progress.compute_summaries == "In Progress" %}
+                        <i class="fa fa-spinner slow-spin fa-fw" style="color: #0065bd;"></i>
+                    {% endif %}
+                </p>
+                {% endif %}
+                <p  id="done" hidden>
+                    <i class="fas fa-check fa-2x" style="color: green;"></i> Computation Finished Succesfully!
+                </p>
+                {% if progress.done and not progress.error %}
+                    <script>document.getElementById("done").hidden = false;</script>
+                {% endif %}
+                <br>
+                <p><button onClick="window.location.reload()">Refresh</button></p>
+                <p>
+                    <b>Please Note:</b> Your results will only be available for {{ timeout }} minutes.
+                    Afterwards it will be deleted automatically, so make sure to download all results you want to use after you've finished your analysis.
+                </p>
+                <br>
+                    <a href="{% url 'analysis' %}" style="margin-top: 20px;" hidden id="view_results"><button class="button button-green">View Results</button></a>
+                {% if progress.done and not progress.error %}
+                    <script>document.getElementById("view_results").hidden = false</script>
+                {% endif %}
+        </div>
+        <div style="float: left; width: 60%; margin-top: 30px">
+                <!-- error -->
+                <h1></h1>
+                <p style="color: #b40e0e;" id="error" hidden><strong>{{ progress.message|safe }}</strong></p>
+                {% if progress.error %}
+                    <script>document.getElementById('error').hidden=false;</script>
+                {% endif %}
+                <!-- warnings -->
+                <p style="color: #ff9900" hidden id="warning">
+                {% if progress.warning %}
+                    <script>document.getElementById('warning').hidden=false;</script>
+                    {% for warn in progress.warning %}
+                        {{ warn }}
+                    {% endfor %}
+                {% endif %}
+                </p>
+
+            <script>updateProgress();</script>
+
+            {% else %}
+                <h3 style="margin-top: 10%; margin-left: 10%; margin-right: 10%">
+                    No Computation in Progress
+                </h3>
+                <p style="margin-right: 10%; margin-left: 10%">
+					Please initialise one via the <a href="{% url 'upload' %}">Upload Page</a>
+                </p>
+            {% endif %}
+
+        </div>
+        {% if progress.unconverted %}
+        <div style="overflow-y: scroll; float: right; width: 40%; height: 12%"
+             id="unconverted">
+            <h5>Unconverted Lipids</h5>
+            {% for lipid in progress.unconverted %}
+                <p>{{ lipid }}</p>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if progress.failed_molspec %}
+        <div style="overflow-y: scroll; float: right; width: 40%; height: 12%"
+             id="failed_molspec">
+            <h5>Failed Molecular Species Inference</h5>
+            {% for lipid in progress.failed_molspec %}
+                <p>{{ lipid }}</p>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}

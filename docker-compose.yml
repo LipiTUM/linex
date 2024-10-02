@@ -1,0 +1,51 @@
+version: "3.5"
+
+services:
+  db:
+    image: postgres
+    environment:
+      - POSTGRES_DB=${DB}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    networks:
+      - linexnet
+  web:
+    build: .
+    ports:
+      - 7000
+    depends_on:
+      - db
+    networks:
+      - linexnet
+    environment:
+      - DJANGO_SETTINGS_MODULE=lipid_network_project.settings.production
+      - POSTGRES_DB=${DB}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - HTTPS=${HTTPS}
+      - ROOT_DOMAIN=${ROOT_DOMAIN}
+    volumes:
+      - static_volume:/webapp/lipid_network_project/static
+      - media_volume:/webapp/lipid_network_project/media
+  nginx:
+    image: nginx:latest
+    ports:
+      - 8084:80
+    depends_on:
+      - web
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./lipid_network_project/static:/data/linex/static
+      - ./lipid_network_project/media:/data/linex/media
+    networks:
+      - linexnet
+    environment:
+      - ROOT_DOMAIN=${ROOT_DOMAIN}
+
+networks:
+  linexnet:
+    driver: bridge
+
+volumes:
+  static_volume:
+  media_volume:

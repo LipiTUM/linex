@@ -1,0 +1,14 @@
+db.sqlite3
+./lipid_network_project/db.sqlite3
+
+lipid_network_project/user_data
+
+*__pycache__
+
+*migrations
+
+*csv
+
+.idea
+
+SECRET/

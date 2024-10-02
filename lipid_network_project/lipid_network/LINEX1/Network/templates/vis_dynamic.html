@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+	<!-- parts of visjs utilities are adapted from pyvis
+		 Copyright (c) 2018, West Health Institute
+		 All rights reserved.
+	-->
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.16.1/vis.css" type="text/css" />
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.16.1/vis-network.min.js"> </script>
+
+	<script type="text/javascript">
+		function fixNodes() {
+			for (const id in nodes.getIds()) {
+				let c_node = nodes.get(id);
+				if (c_node != null) {
+					c_node["physics"] = false;
+					nodes.update(c_node);
+				}
+			}
+		}
+
+		function fixEdges() {
+			for (const id in edges.getIds()) {
+				let c_edge = edges.get(id);
+				if (c_edge != null) {
+					c_edge["physics"] = false;
+					edges.update(c_edge);
+				}
+			}
+		}
+
+		// TODO: add properties and whether they need a group/comparison etc.
+		// TODO: add annotations
+		const propertyGroups = {
+			"lipid_class": "none",
+			"desaturation": "none",
+			"chain_length": "none",
+			"c_index": "none",
+			"db_index": "none",
+			"fold_changes": "comparison",
+			"nlog_pvalues": "comparison",
+			"degree": "none",
+			"betweenness": "none",
+			"closeness": "none",
+			"correlation_changes": "comparison",
+			"correlations": "group",
+			"reaction_types": "none"
+		};
+
+		const propertyContinuous = {
+			"lipid_class": false,
+			"desaturation": true,
+			"chain_length": true,
+			"c_index": true,
+			"db_index": true,
+			"fold_changes": true,
+			"nlog_pvalues": true,
+			"degree": true,
+			"betweenness": true,
+			"closeness": true,
+			"correlation_changes": false,
+			"correlations": true,
+			"reaction_types": false
+		};
+
+		function getSelectedProperty(selector) {
+			const elem = document.getElementById(selector);
+			if (elem !== null && elem !== undefined) {
+				if (elem.options !== null) return elem.options[elem.selectedIndex].value;
+			}
+			return null;
+		}
+
+		function drawLegend(legend, legendNodes, legendEdges, options, containerId) {
+			let legendData;
+			let container = document.getElementById(containerId);
+
+			// parsing and collecting nodes and edges from the python
+			const step_x = 120;
+			const step_y = 50;
+			const x = -container.clientWidth / 2 + 50;
+			const y = -container.clientHeight / 2 + 50;
+			const ids = legendNodes.getIds();
+			for (const id in ids) {
+				const c_node = legendNodes.get(id)
+				const new_x = x + c_node.x * step_x;
+				const new_y = y + c_node.y * step_y;
+				legendNodes.update(
+					{
+						id: c_node.id,
+						x: new_x,
+						y: new_y
+					}
+				);
+			}
+
+			legendData = {nodes: legendNodes, edges: legendEdges};
+			legend = new vis.Network(container, legendData, options);
+
+			return legend
+		}
+
+		function fitLegend(legend, legend_nodes) {
+			legend.fit();
+			let c_node;
+			for (const id in legend_nodes.getIds()) {
+				c_node = legend_nodes.get(id);
+				if (c_node !== null) {
+					// TODO: optimise this step
+					c_node.x = c_node.x - 130;
+					legend_nodes.update(c_node)
+				}
+			}
+		}
+
+		// annotations
+		function elementAnnotation(elements, attrAnnotation, hasDynamic) {
+			let elem, val, opt;
+			let annotation;
+			for (const id in elements.getIds()) {
+				elem = elements.get(id);
+				if (elem != null) {
+					annotation = elem["fixed_annotation"];
+					if (hasDynamic) {
+						for (const opt_i in Object.keys(attrAnnotation)) {
+							opt = Object.keys(attrAnnotation)[opt_i];
+							val = elem[attrAnnotation[opt]];
+							if (val !== undefined) {
+								if (typeof(val) === "number") {
+									// NOTE: Math.round rounds to integer
+									// => (x * 1000) / 1000 rounds to three decimal places
+									val = Math.round(val * 1000) / 1000;
+								}
+								annotation += "<br><b>" + opt + "</b>: " + val;
+							}
+						}
+					}
+					elem["title"] = annotation;
+					elements.update(elem);
+				}
+			}
+			return elements;
+		}
+
+		function updateAnnotation() {
+			// update node annotations based on a 'fixed'
+			// annotation part and dynamic one dependent
+			// on the groups
+			// e.g fold-changes: fc_group1_group2
+			let attrAnnotation = [{}];
+			let pg, opt;
+			let hasDynamic = false;
+			if (document.getElementById("groups") !== null) {
+				hasDynamic = true;
+				const comp = getSelectedProperty("groups");
+				// selecting single groups contained in comparison
+				// only simple substring matching => not working for all group annotations!
+				let compGroups = [];
+				let singGroups = document.getElementById("single_groups");
+				if (singGroups !== null) {
+					let cGroup;
+					for (let i = 0; i < singGroups.options.length; i++) {
+						cGroup = singGroups.options[i].value;
+						if (comp.includes(cGroup)) {
+							compGroups.push(cGroup);
+						}
+					}
+				}
+				let group = "";
+				for (const opt_i in Object.keys(propertyGroups)) {
+					opt = Object.keys(propertyGroups)[opt_i];
+					pg = propertyGroups[opt];
+					if (pg === "comparison") {
+						attrAnnotation[opt] = opt + "_" + comp;
+					} else if (pg === "group") {
+						let optAnnot;
+						for (let i = 0; i < compGroups.length; i++) {
+							group = compGroups[i];
+							optAnnot =  opt + "_" + group;
+							attrAnnotation[optAnnot] = optAnnot;
+						}
+					}
+				}
+			} else {
+				for (const opt_i in Object.keys(propertyGroups)) {
+					opt = Object.keys(propertyGroups)[opt_i];
+					pg = propertyGroups[opt];
+					if (pg === "group") {
+						hasDynamic = true;
+						attrAnnotation[opt] = opt;
+					}
+				}
+			}
+			nodes = elementAnnotation(nodes, attrAnnotation, hasDynamic);
+			edges = elementAnnotation(edges, attrAnnotation, hasDynamic);
+		}
+
+		function updateComparison() {
+			if (propertyGroups[getSelectedProperty("node_colours")] === "comparison") {
+				updateNodeColour();
+			}
+			if (propertyGroups[getSelectedProperty("node_sizes")] === "comparison") {
+				updateNodeSize();
+			}
+			if (propertyGroups[getSelectedProperty("edge_colours")] === "comparison") {
+				updateEdgeColour();
+			}
+			if (propertyGroups[getSelectedProperty("edge_sizes")] === "comparison") {
+				updateEdgeSize();
+			}
+			updateAnnotation();
+			fitLegend(colourLegend, legendNodeColours);
+			fitLegend(sizeLegend, legendNodeSizes);
+		}
+
+		function updateGroup() {
+			if (propertyGroups[getSelectedProperty("node_colours")] === "group") {
+				updateNodeColour();
+			}
+			if (propertyGroups[getSelectedProperty("node_sizes")] === "group") {
+				updateNodeSize();
+			}
+			if (propertyGroups[getSelectedProperty("edge_colours")] === "group") {
+				updateEdgeColour();
+			}
+			if (propertyGroups[getSelectedProperty("edge_sizes")] === "group") {
+				updateEdgeSize();
+			}
+			updateAnnotation();
+			fitLegend(colourLegend, legendNodeColours);
+			fitLegend(sizeLegend, legendNodeSizes);
+		}
+
+		function addGroupNames(property, addition = "") {
+			if (propertyGroups[property] === "none") {
+				if (addition === "")  return property;
+				return property + "_" + addition;
+			} else if (propertyGroups[property] === "group") {
+				let select = getSelectedProperty("single_groups")
+				// catching the case where no groups are given
+				if (select === null) return property + "_" + addition;
+				return property + "_" + addition + "_" + select;
+			}
+			return property + "_" + addition + "_" + getSelectedProperty("groups");
+		}
+
+		function updateAttribute(attributeType, legendId, legend, elements, legendElements) {
+			let legendProp = getSelectedProperty(legendId);
+			let prop = addGroupNames(legendProp, attributeType);
+			// adding whether the continuous, group dependent
+			prop = addScale(prop, legendProp);
+			let typeName;
+			if (attributeType === "colour") {
+				typeName = "color";
+			} else {
+				typeName = "size";
+			}
+			// network elements
+			const ids = elements.getIds();
+			let elem, borderColour, borderWidth;
+			// this leaves the option to set a user-defined cutoff
+			let thresh = -Math.log10(parseFloat(getCutoff("significanceThreshold")));
+			let showSignificance = document.getElementById("significantSwitch").checked;
+			let pvalColour = typeName === "color" && prop.startsWith("nlog_pvalues");
+			for (const id in ids) {
+				elem = elements.get(id);
+				// FIXME: change prop with scaleProp
+				if (elem != null) {
+					if (pvalColour && showSignificance) {
+						if (elem[prop.replace("_colour", "")] > thresh) {
+							borderColour = "#00cb2b";
+							borderWidth = 3;
+						} else {
+							borderColour = "rgba(255,255,255,0.27)";
+							borderWidth = 0;
+						}
+						elem['color'] = {
+							'background': elem[prop],
+							'border': borderColour
+						}
+						elem['borderWidth'] = borderWidth;
+					} else {
+						elem[typeName] = elem[prop];
+					}
+					elements.update(elem);
+				}
+			}
+			if (pvalColour) borderColourExplanation("significanceAnnotation", false);
+			else if (legendId.startsWith("node_colours")) {
+				borderColourExplanation("significanceAnnotation", true);
+			}
+			// legend elements
+			// FIXME: add in scale_prop
+			let propBak = prop + "_" + attributeType;
+			const legendIds = legendElements.getIds();
+			let legendElem;
+			for (const id in legendIds) {
+				 legendElem = legendElements.get(id);
+				if (legendElem != null) {
+					const elem_prop =  legendElem[propBak];
+					if (elem_prop != null) {
+						legendElem[typeName] = legendElem[propBak];
+						legendElem["label"] = legendElem[propBak + "_label"];
+						legendElem["hidden"] = false;
+						legendElements.update(legendElem);
+					} else {
+						legendElem["hidden"] = true;
+					}
+				}
+				legendElements.update(legendElem);
+			}
+
+			if (legendProp !== "fold_changes") {
+				if (attributeType === "colour") {
+					document.getElementById("srcGroupFcColour").innerHTML = "";
+					document.getElementById("tgtGroupFcColour").innerHTML = "";
+				} else if (attributeType === "size") {
+					document.getElementById("srcGroupFcSize").innerHTML = "";
+					document.getElementById("tgtGroupFcSize").innerHTML = "";
+				}
+			} else {
+				if (attributeType === "colour") {
+					logFcExplanation(
+						document.getElementById('srcGroupFcColour'),
+						document.getElementById('tgtGroupFcColour'),
+						attributeType
+					);
+				} else if (attributeType === "size") {
+					logFcExplanation(
+						document.getElementById('srcGroupFcSize'),
+						document.getElementById('tgtGroupFcSize'),
+						attributeType
+					);
+				}
+			}
+		}
+
+		function updateNodeColour() {
+			updateAttribute(
+				"colour", "node_colours", colourLegend,
+				nodes, legendNodeColours
+			);
+			fitLegend(colourLegend, legendNodeColours);
+		}
+		function updateNodeSize() {
+			updateAttribute(
+					"size", "node_sizes", sizeLegend,
+					nodes, legendNodeSizes
+			);
+			fitLegend(sizeLegend, legendNodeSizes);
+		}
+		function updateEdgeColour() {
+			updateAttribute(
+				"colour", "edge_colours", colourLegend,
+				edges, legendEdgeColours
+			);
+			fitLegend(colourLegend, legendNodeColours);
+		}
+		function updateEdgeSize() {
+			updateAttribute(
+					"size", "edge_sizes", sizeLegend,
+					edges, legendEdgeSizes
+			);
+			fitLegend(sizeLegend, legendNodeSizes);
+		}
+
+		function findLipid() {
+			let name = document.getElementById("lipid_search").value;
+			let node, lipidId;
+			for (const id in nodes.getIds()) {
+				node = nodes.get(id);
+				if (node !== null) {
+					if (node["label"] === name)	{
+						lipidId = node["id"];
+						break;
+					}
+				}
+			}
+			network.focus(lipidId, {'scale': 2});
+			let selection = [lipidId];
+			network.selectNodes(selection);
+		}
+
+		function findSubLipid() {
+			let name = document.getElementById("sub_search").value;
+			let re = RegExp(name);
+			let node;
+			let selection = [];
+			for (const id in nodes.getIds()) {
+				node = nodes.get(id);
+				if (node !== null) {
+					// with regex
+					if (re.test(node["label"])) {
+						selection.push(node["id"]);
+					}
+				}
+			}
+			if (selection.length > 0) {
+				network.selectNodes(selection);
+			}
+		}
+
+		// edge selection grey-out
+		function fadeElements(
+			legendSelection, legendElements,
+			networkElements, propertySelector
+		) {
+			let property = getSelectedProperty(propertySelector);
+			property = addGroupNames(property, "colour");
+			let legendProperty = property + "_colour";
+
+			let selectedGroups = [];
+			let elem;
+			for (const i in legendSelection) {
+				elem = legendElements.get(legendSelection[i]);
+				if (elem !== null) {
+					selectedGroups.push(elem[legendProperty]);
+				}
+			}
+
+			for (const id in networkElements.getIds()) {
+				elem = networkElements.get(id);
+				if (elem !== null) {
+					if (!selectedGroups.includes(elem[property])) {
+						elem['color'] = "#e1e5e7";
+					} else {
+						elem['color'] = elem[property];
+					}
+					networkElements.update(elem);
+				}
+			}
+		}
+
+		function fadeUnselectedNodes() {
+			let selection = colourLegend.getSelectedNodes();
+			if (selection.length === 0) {
+				updateNodeColour();
+			} else {
+				fadeElements(
+					selection, legendNodeColours,
+					nodes, "node_colours"
+				);
+			}
+		}
+		function fadeUnselectedEdges() {
+			let selection = colourLegend.getSelectedEdges();
+			if (selection.length === 0) {
+				updateEdgeColour();
+			} else {
+				fadeElements(
+					selection, legendEdgeColours,
+					edges, "edge_colours"
+				);
+			}
+		}
+
+		function PhysicsToggle() {
+			changeShownEdges()
+			let checked = document.getElementById("physicsswitch");
+			if (checked.checked){
+				for (const id in nodes.getIds()) {
+					let c_node = nodes.get(id);
+					if (c_node != null) {
+						c_node["physics"] = true;
+						nodes.update(c_node);
+					}
+				}
+				for (const id in edges.getIds()) {
+					let c_edge = edges.get(id);
+					if (c_edge != null) {
+						if(c_edge["hidden"]){
+						c_edge["physics"] = false;
+						} else {
+						c_edge["physics"] = true;
+						}
+						edges.update(c_edge);
+					}
+				}
+			} else {
+				fixNodes();
+				fixEdges();
+			}
+		}
+
+		function changeShownEdges() {
+			let e = document.getElementById("showEdgeType").value;
+			let checked = document.getElementById("physicsswitch").checked;
+			let curr_edge;
+			if (e === "all"){
+				for (const eid in edges.getIds()) {
+					edges.update([{id: eid, hidden: false, physics: true}]);
+				}
+			} else if (e === "class") {
+				for (const eid in edges.getIds()) {
+					curr_edge = edges.get(eid);
+					if (curr_edge.reaction_types === "Chain length" || curr_edge.reaction_types === "Desaturation"){
+						edges.update([{id: eid, hidden: true, physics: false}]);
+					} else {
+					edges.update([{id: eid, hidden: false, physics: true}]);
+					}
+				}
+			} else if (e === "fa"){
+				for (const eid in edges.getIds()) {
+					curr_edge = edges.get(eid);
+					if (curr_edge.reaction_types === "Chain length" || curr_edge.reaction_types === "Desaturation"){
+						edges.update([{id: eid, hidden: false, physics: true}]);
+					} else {
+					edges.update([{id: eid, hidden: true, physics: false}]);
+					}
+				}
+			}
+		}
+
+		function showLegendNavigation() {
+			let navs = document.getElementsByClassName("vis-button");
+			let i;
+			if (document.getElementById("legend_nav").checked) {
+				for (i = 0; i < navs.length; i++) {
+					navs[i].style.display = 'none';
+				}
+				document.getElementById("nav_label").innerHTML = "Show Legend Navigation";
+			} else {
+				for (i = 0; i < navs.length; i++) {
+					navs[i].style.display = 'inline';
+				}
+				document.getElementById("nav_label").innerHTML = "Hide Legend Navigation";
+			}
+		}
+
+		function getComparisonGroups() {
+			let comp = getSelectedProperty("groups");
+			let groupNames = document.getElementById("single_groups").options;
+			let currGroup, srcGroup, tgtGroup;
+			for (var i = 0; i < groupNames.length; i++) {
+				currGroup = groupNames[i].value;
+				if (comp.includes(currGroup + "_")) {
+					srcGroup = currGroup;
+				} else if (comp.includes("_" + currGroup)) {
+					tgtGroup = currGroup;
+				}
+			}
+			return {srcGroup, tgtGroup};
+		}
+
+		function logFcExplanation(srcElement, tgtElement, attributeType) {
+			let compGroups = getComparisonGroups();
+			let highStr, lowStr;
+			if (attributeType === "colour") {
+				highStr = "<b style=\"color: #00004c\">Blue Nodes</b>:<br>higher abundance in '" + compGroups["tgtGroup"] + "'";
+				lowStr = "<b style=\"color: #800000\">Red Nodes</b>:<br>higher abundance in '" + compGroups["srcGroup"] + "'";
+			} else {
+				highStr = "<b>Large Nodes</b>:<br>higher abundance in '" + compGroups["tgtGroup"] + "'";
+				lowStr = "<b>Small Nodes</b>:<br>higher abundance in '" + compGroups["srcGroup"] + "'";
+			}
+			srcElement.innerHTML = highStr;
+			tgtElement.innerHTML = lowStr;
+		}
+
+		function getCutoff(cutoffElement) {
+			return document.getElementById(cutoffElement).value;
+		}
+
+		function borderColourExplanation(elementId, remove=false) {
+			if (remove) {
+				document.getElementById(elementId).innerHTML = "";
+			} else {
+				let thresh = getCutoff("significanceThreshold");
+				document.getElementById(elementId).innerHTML = "<b style='color: #00cb2b'>Node Border</b>: FDR < " + thresh;
+			}
+		}
+
+		function updateCutoff() {
+			updateAttribute(
+				"colour", "node_colours", colourLegend,
+				nodes, legendNodeColours
+			)
+		}
+
+		function updateScale() {
+			let nodeColourAttr = getSelectedProperty("node_colours");
+			if (propertyGroups[nodeColourAttr] !== "none") {
+				updateNodeColour();
+			}
+			let edgeColourAttr = getSelectedProperty("edge_colours");
+			if (propertyGroups[edgeColourAttr] !== "none") {
+				updateEdgeColour();
+			}
+			let nodeSizeAttr = getSelectedProperty("node_sizes");
+			if (propertyGroups[nodeSizeAttr] !== "none") {
+				updateNodeSize();
+			}
+			let edgeSizeAttr = getSelectedProperty("edge_sizes");
+			if (propertyGroups[edgeSizeAttr] !== "none") {
+				updateEdgeSize();
+			}
+		}
+
+		function addScale(property, selectedProp) {
+			// checking if scale choice should be added
+			// => needs to be continuous, group-dependent and groups have to be specified
+			if (propertyGroups[selectedProp] === "none" ||
+				!propertyContinuous[selectedProp] ||
+				getSelectedProperty("single_groups") === null)
+			{
+				return property;
+			}
+			let commonScale = document.getElementById("scaleSwitch");
+			if (commonScale.checked) return property + "_common";
+			return property + "_individual";
+		}
+
+    </script>
+
+    <style>
+		body {
+			background-color: #ededeeff;
+		}
+
+		::-webkit-scrollbar {
+			border-radius: 7px;
+		}
+
+		/*
+		some elements are adapted from pyvis
+		Copyright (c) 2018, West Health Institute
+		All rights reserved.
+		*/
+
+		h5 {
+			height: 3%;
+			margin-bottom: .3rem;
+			background-color: #e6f1faff;
+			border-radius: 7px 7px 0 0;
+			vertical-align: middle;
+		}
+
+		#lipid_network {
+			width: 95%;
+			height: 92vh;
+			position: absolute;
+			padding-left: 2.5%;
+		}
+
+		#network {
+			width: 90%;
+			height: 92vh;
+			background-color: white;
+			position: relative;
+			left: 15%;
+		}
+
+		#network_graph {
+			width: 80%;
+			height: 92vh;
+			position: relative;
+			float: right;
+			border-color: #005293ff;
+			border-style: solid;
+			border-width: 2px;
+			border-radius: 7px;
+			background-color: white;
+		}
+
+		#visjs {
+			width: 100%;
+			height: 95%;
+			position: relative;
+		}
+
+		#legend {
+			width: 20%;
+			position: absolute;
+			border-color: #005293ff;
+			border-style: solid;
+			border-width: 2px;
+			border-radius: 7px;
+			height: 92vh;
+			margin-left: -2.15%;
+			background-color: white;
+		}
+
+		/*TODO: make legends collapsable*/
+		/*TODO: make colour_legend height dependent on number of non-hidden nodes*/
+		#colour_legend {
+			width: 100%;
+			height: 48%;
+			position: relative;
+			float: left;
+			overflow: auto;
+			border-top: 1px solid #ccc;
+			border-bottom: 1px solid #ccc;
+		}
+
+		#size_legend {
+			width: 100%;
+			height: 43vh;
+			position: relative;
+			float: left;
+			overflow: auto;
+		}
+
+		/*TODO: collapsable sidebar*/
+		#sidebar {
+			width: 13%;
+			height: 92vh;
+			position: absolute;
+			border-color: #005293ff;
+			border-style: solid;
+			border-width: 2px;
+			margin-left: -2%;
+			border-radius: 7px;
+			background-color: white;
+		}
+
+		select {
+			width: 100%;
+			text-overflow: ellipsis;
+			text-align: center;
+			text-align-last: center;
+			-moz-text-align-last: center;
+		}
+
+		#loadingBar {
+			position: relative;
+			float: right;
+			width: 80%;
+			height: 80vh;
+			background-color: rgba(200,200,200,0.8);
+			-webkit-transition: all 0.5s ease;
+			-moz-transition: all 0.5s ease;
+			-ms-transition: all 0.5s ease;
+			-o-transition: all 0.5s ease;
+			transition: all 0.5s ease;
+			opacity:1;
+		}
+
+		#bar {
+			position:absolute;
+			top: 0;
+			left: 0;
+			width: 20px;
+			height: 20px;
+			margin: auto auto auto auto;
+			border-radius: 11px;
+			border: 2px solid rgba(30,30,30,0.05);
+			background: rgb(0, 173, 246); /* Old browsers */
+			box-shadow: 2px 0 4px rgba(0,0,0,0.4);
+		}
+
+		#border {
+			position:absolute;
+			top:10px;
+			left:10px;
+			width:500px;
+			height:23px;
+			margin:auto auto auto auto;
+			box-shadow: 0px 0px 4px rgba(0,0,0,0.2);
+			border-radius:10px;
+		}
+
+		#text {
+			position:absolute;
+			top:8px;
+			left:530px;
+			width:30px;
+			height:50px;
+			margin:auto auto auto auto;
+			font-size:22px;
+			color: #000000;
+		}
+
+		/* toggle switches */
+		.switch {
+		  position: relative;
+		  display: inline-block;
+		  width: 60px;
+		  height: 34px;
+		}
+
+		.switch input {
+		  opacity: 0;
+		  width: 0;
+		  height: 0;
+		}
+
+		.slider {
+		  position: absolute;
+		  cursor: pointer;
+		  top: 0;
+		  left: 0;
+		  right: 0;
+		  bottom: 0;
+		  background-color: #ccc;
+		  -webkit-transition: .4s;
+		  transition: .4s;
+		}
+
+		.slider:before {
+		  position: absolute;
+		  content: "";
+		  height: 26px;
+		  width: 26px;
+		  left: 4px;
+		  bottom: 4px;
+		  background-color: white;
+		  -webkit-transition: .4s;
+		  transition: .4s;
+		}
+
+		input:checked + .slider {
+		  background-color: #0065bd;
+		}
+
+		input:focus + .slider {
+		  box-shadow: 0 0 1px #0065bd;
+		}
+
+		input:checked + .slider:before {
+		  -webkit-transform: translateX(26px);
+		  -ms-transform: translateX(26px);
+		  transform: translateX(26px);
+		}
+
+		/* Rounded sliders */
+		.slider.round {
+		  border-radius: 34px;
+		}
+
+		.slider.round:before {
+		  border-radius: 50%;
+		}
+
+		div.outerBorder {
+			position:relative;
+			top:400px;
+			width:600px;
+			height:44px;
+			margin:auto auto auto auto;
+			border:8px solid rgba(0,0,0,0.1);
+			background: rgb(252,252,252); /* Old browsers */
+			background: -moz-linear-gradient(top,  rgba(252,252,252,1) 0%, rgba(237,237,237,1) 100%); /* FF3.6+ */
+			background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,rgba(252,252,252,1)), color-stop(100%,rgba(237,237,237,1))); /* Chrome,Safari4+ */
+			background: -webkit-linear-gradient(top,  rgba(252,252,252,1) 0%,rgba(237,237,237,1) 100%); /* Chrome10+,Safari5.1+ */
+			background: -o-linear-gradient(top,  rgba(252,252,252,1) 0%,rgba(237,237,237,1) 100%); /* Opera 11.10+ */
+			background: -ms-linear-gradient(top,  rgba(252,252,252,1) 0%,rgba(237,237,237,1) 100%); /* IE10+ */
+			background: linear-gradient(to bottom,  rgba(252,252,252,1) 0%,rgba(237,237,237,1) 100%); /* W3C */
+			filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#fcfcfc', endColorstr='#ededed',GradientType=0 ); /* IE6-9 */
+			border-radius:72px;
+			box-shadow: 0px 0px 10px rgba(0,0,0,0.2);
+		}
+
+		/* vis legend navigation buttons */
+		div.vis-network div.vis-navigation div.vis-button.vis-up,
+		div.vis-network div.vis-navigation div.vis-button.vis-down,
+		div.vis-network div.vis-navigation div.vis-button.vis-left,
+		div.vis-network div.vis-navigation div.vis-button.vis-right,
+		div.vis-network div.vis-navigation div.vis-button.vis-zoomIn,
+		div.vis-network div.vis-navigation div.vis-button.vis-zoomOut,
+		div.vis-network div.vis-navigation div.vis-button.vis-zoomExtends {
+		  background-image: none !important;
+		}
+
+		div.vis-network div.vis-navigation div.vis-button:hover {
+		  box-shadow: none !important;
+		}
+
+		.vis-button:after {
+		  font-size: 2em;
+		  color: gray;
+		}
+
+		.vis-button.vis-up:after {
+			content: '\f106';
+			font-family: FontAwesome;
+		}
+
+		.vis-button.vis-down:after {
+			content: '\f107';
+			font-family: FontAwesome;
+		}
+
+		.vis-button.vis-left:after {
+			content: '\f104';
+			font-family: FontAwesome;
+		}
+
+		.vis-button.vis-right:after {
+			content: '\f105';
+			font-family: FontAwesome;
+		}
+
+		.vis-button.vis-zoomIn:after {
+		  	content: "+";
+		}
+
+		.vis-button.vis-zoomOut:after {
+			content: "−";
+			padding-top: 12px;
+		}
+
+		.vis-button.vis-zoomExtends:after {
+			content: "\f0b2";
+			font-family: FontAwesome;
+			font-size: 1.5em;
+		}
+
+		/* key stuff */
+		.your-centered-div {
+			width: 560px; /* you have to have a size or this method doesn't work */
+			height: 315px; /* think about making these max-width instead - might give you some more responsiveness */
+
+			position: absolute; /* positions out of the flow, but according to the nearest parent */
+			top: 0; right: 0; /* confuse it i guess */
+			bottom: 0; left: 0;
+			margin: auto; /* make em equal */
+		}
+	</style>
+</head>
+	<body>
+        <div id="lipid_network" style="padding-top: 15px;">
+		<div id="sidebar" class="sidebar">
+			<h5 class="text-center">Network Options</h5>
+			<div style="overflow-y: auto; overflow-x: hidden; padding: 5px; height: 96%; border-radius: 7px">
+				{% if node_colours %}
+				<label for="node_colours"><b>Node Colours</b></label>
+				<select name="node_colours" id="node_colours" onchange="updateNodeColour()">
+					{% for attr, name in node_colours.items() %}
+					<option value="{{ attr }}">{{ name }}</option>
+					{% endfor %}
+				</select>
+				{% endif %}
+
+				{% if edge_colours %}
+				<label for="edge_colours"><b>Edge Colours</b></label>
+				<select name="edge_colours" id="edge_colours" onchange="updateEdgeColour()">
+					{% for attr, name in edge_colours.items() %}
+					<option value="{{ attr }}">{{ name }}</option>
+					{% endfor %}
+				</select>
+				{% endif %}
+
+				{% if node_sizes %}
+				<label for="node_sizes"><b>Node Sizes</b></label>
+				<select name="node_sizes" id="node_sizes" onchange="updateNodeSize()">
+					{% for attr, name in node_sizes.items() %}
+					<option value="{{ attr }}">{{ name }}</option>
+					{% endfor %}
+				</select>
+				{% endif %}
+
+				{% if groups %}
+				<label for="groups"><b>Comparison</b></label>
+				<select name="groups" id="groups" onchange="updateComparison()">
+					{% for comp in groups %}
+					<option value="{{ comp }}">{{ comp }}</option>
+					{% endfor %}
+				</select>
+				{% endif %}
+
+				{% if single_groups %}
+				<label for="single_groups"><b>Group</b></label>
+				<select name="single_groups" id="single_groups" onchange="updateGroup()">
+					{% for group in single_groups %}
+					<option value="{{ group }}">{{ group }}</option>
+					{% endfor %}
+				</select>
+				{% endif %}
+
+				<label for="lipid_search" style="margin-top: 25px"><b>Find Lipid Species</b></label>
+				<input list="nodeLabels" id="lipid_search">
+				<datalist id="nodeLabels"></datalist>
+				<button onclick="findLipid()" style="padding-left: 15px; padding-right: 15px; margin-bottom: 25px; margin-right: 25%">Find</button>
+
+				<label for="sub_search" style="margin-top: 25px"><b>Find by Substring</b></label>
+				<input type="text" id="sub_search">
+				<button onclick="findSubLipid()" style="padding-left: 15px; padding-right: 15px; margin-bottom: 25px">Find</button>
+
+				<!-- Shows all, only class of only FA reactions -->
+				<br>
+				<br>
+				<label for="showEdgeType"><b>Shown reaction types</b></label>
+				<select name="showEdgeType" id="showEdgeType" onchange="changeShownEdges()">
+
+					<option value="all">all</option>
+
+					<option value="class">only Class reactions</option>
+
+					<option value="fa">only FA reactions</option>
+				</select>
+
+				<!-- setting significance threshold for border colouring -->
+				<br>
+				<br>
+				<label for="significanceThreshold" style="margin-top: 25px"><b>Significance Threshold</b></label>
+				<input type="number" id="significanceThreshold" value="0.05" min="0" max="1" step="0.001">
+				<button onclick="updateCutoff()" style="padding-left: 15px; padding-right: 15px">Update</button>
+				<br>
+				<div style="margin-top: 5%">
+					<label class="switch">
+						<input type="checkbox" id="significantSwitch" onchange="updateNodeColour()">
+						<span class="slider round"></span>
+					</label>
+					<b>Highlight</b>
+					<script>
+						document.getElementById("significantSwitch").checked = true;
+					</script>
+				</div>
+
+				<!-- Physics toggle switch-->
+				<div>
+					<label class="switch">
+						<input type="checkbox" id="physicsswitch" onchange="PhysicsToggle()">
+						<span class="slider round"></span>
+					</label>
+					<b>Enable physics</b>
+				</div>
+
+				<!-- Scale switch -->
+				<div>
+					<label class="switch">
+						<input type="checkbox" id="scaleSwitch" onchange="updateScale()">
+						<span class="slider round"></span>
+					</label>
+					<b>Unified Scales</b>
+				</div>
+
+				<br>
+				<br>
+				<div>
+					<p style="margin-top: 35px">If you use LINEX, please cite our paper: <br>
+					<a href="https://doi.org/10.3390/metabo11080488">Köhler and Rose et al. <b>Investigating Global Lipidome Alterations with the Lipid Network Explorer</b>.
+						<i>Metabolites</i> <b>2021</b>, 11, 488</a> <br></p>
+				</div>
+
+				<p id="srcGroupFcColour"></p>
+				<p id="tgtGroupFcColour"></p>
+				<p id="srcGroupFcSize"></p>
+				<p id="tgtGroupFcSize"></p>
+
+				<p id="significanceAnnotation"></p>
+			</div>
+		</div>
+		<div id="network">
+			<div id="legend" class="legend">
+				{% if colour_legend %}
+				<h5 class="text-center">Legend</h5>
+				<div style="display: flex; float: left; width: 100%; height: 4%">
+					<label class="switch" style="margin-right: 2.5%;">
+						<input type="checkbox" id="legend_nav" onchange="showLegendNavigation()">
+						<span class="slider round" content="Show Navigation" id="nav_slider"></span>
+					</label>
+					<p id="nav_label" style="font-size: .75em; margin-top: 2.5%;">Hide Legend Navigation</p>
+				</div>
+				<div id="colour_legend">
+					<script type="text/javascript">
+						let drawOptions = {{options|safe}};
+						if (!drawOptions["interaction"]) {
+							drawOptions["interaction"] = {"navigationButtons": true};
+						} else {
+							drawOptions["interaction"]["navigationButtons"] = true;
+						}
+
+						let legendNodeColours = new vis.DataSet({{legend_colour_nodes|tojson}});
+						let legendEdgeColours = new vis.DataSet({{legend_colour_edges|tojson}});
+						let colourLegend;
+
+						colourLegend = drawLegend(
+							colourLegend, legendNodeColours,
+							legendEdgeColours, drawOptions,
+							"colour_legend"
+						);
+						colourLegend.setOptions({"interaction": {"multiselect": true}});
+					</script>
+				</div>
+				{% endif %}
+				{% if size_legend %}
+				<div id="size_legend">
+					<script type="text/javascript">
+						let legendNodeSizes = new vis.DataSet({{legend_size_nodes|tojson}});
+						let legendEdgeSizes = new vis.DataSet({{legend_size_edges|tojson}});
+						let sizeLegend;
+
+						sizeLegend = drawLegend(
+							sizeLegend, legendNodeSizes,
+							legendEdgeSizes, drawOptions,
+							"size_legend"
+						);
+					</script>
+				</div>
+			</div>
+			{% endif %}
+			<div id="graph" class="graph">
+				<div id="loadingBar">
+					<div class="outerBorder">
+						<div id="text">0%</div>
+						<div id="border">
+							<div id="bar"></div>
+						</div>
+					</div>
+				</div>
+				<div id="network_graph">
+					<h5 class="text-center">Network</h5>
+					<div id="visjs">
+						<script type="text/javascript">
+							// NOTE: this part is adapted from pyvis
+							// initialize global variables.
+							let edges;
+							let nodes;
+							let network;
+							let options, data;
+
+							// This method is responsible for drawing the graph, returns the drawn network
+							function drawGraph() {
+								let container;
+								container = document.getElementById('network_graph');
+
+								// parsing and collecting nodes and edges from the python
+								nodes = new vis.DataSet({{nodes|tojson}});
+								edges = new vis.DataSet({{edges|tojson}});
+
+								// adding nodes and edges to the graph
+								data = {nodes: nodes, edges: edges};
+								options = {{options|safe}};
+								options["physics"]["solver"] = "forceAtlas2Based";
+								if (options["edges"]["smooth"]["type"] === "curvedCW") {
+									options["edges"]["smooth"]["roundness"] = .2;
+									options["physics"]["stabilization"]["iterations"] = 100;
+								}
+								network = new vis.Network(container, data, options);
+
+								network.on("stabilizationProgress", function (params) {
+									document.getElementById('loadingBar').removeAttribute("style");
+									const maxWidth = 496;
+									const minWidth = 20;
+									const widthFactor = params.iterations / params.total;
+									const width = Math.max(minWidth, maxWidth * widthFactor);
+
+									document.getElementById('bar').style.width = width + 'px';
+									document.getElementById('text').innerHTML = Math.round(widthFactor * 100) + '%';
+								});
+								network.once("stabilizationIterationsDone", function () {
+									document.getElementById('text').innerHTML = '100%';
+									document.getElementById('bar').style.width = '496px';
+									document.getElementById('loadingBar').style.opacity = 0;
+									fixNodes();
+									fixEdges();
+									// really clean the dom element
+									setTimeout(function () {
+										document.getElementById('loadingBar').style.display = 'none';
+									}, 500);
+									sizeLegend.moveTo({"scale": network.getScale()})
+								});
+
+								return network;
+							}
+							drawGraph();
+							// generating all colours with the current selection
+							if (document.getElementById("node_colours") !== null) {
+								updateNodeColour();
+							}
+							if (document.getElementById("edge_colours") !== null) {
+								updateEdgeColour();
+							}
+							// same as above with sizes
+							if (document.getElementById("node_sizes") !== null) {
+								updateNodeSize();
+							}
+							if (document.getElementById("edge_sizes") !== null) {
+								updateEdgeSize();
+							}
+							fitLegend(colourLegend, legendNodeColours);
+							// fitLegend(sizeLegend, legendNodeSizes);
+							// annotations
+							updateAnnotation();
+							// keeping the same zoom leven between size legend and network
+							network.on("zoom", function(){
+								network.moveTo({"scale": network.getScale()})
+								sizeLegend.moveTo({"scale": network.getScale()})
+							})
+							colourLegend.on("selectEdge", function(params) {
+								fadeUnselectedEdges();
+							});
+							colourLegend.on("selectNode", function(params) {
+								fadeUnselectedNodes();
+							});
+							// resetting legend position
+							colourLegend.on("click", function(params) {
+								let opts = {
+									'scale': colourLegend.getScale(),
+									'position': colourLegend.getViewPosition()
+								};
+								fadeUnselectedEdges();
+								fadeUnselectedNodes();
+								colourLegend.setOptions(opts);
+							});
+							// options list for node search
+							let nodeLabels = "";
+							let node;
+							for (let i = 0; i < nodes.length; i++) {
+								node = nodes.get(i);
+								if (node !== null) {
+									nodeLabels += "<option value=" + node["label"] + ">";
+								}
+							}
+							document.getElementById("nodeLabels").innerHTML = nodeLabels;
+						</script>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	</body>
+</html>

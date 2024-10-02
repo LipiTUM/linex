@@ -1,0 +1,262 @@
+{% extends 'lipid_network/base.html' %}
+{% load static %}
+
+{% block style %}
+    <style>
+        input[disabled] {
+            background-color: grey;
+        }
+        /* collapsibles */
+        [data-toggle="collapse"] .fa:before {
+            content: "\f139";
+        }
+
+        [data-toggle="collapse"].collapsed .fa:before {
+            content: "\f13a";
+        }
+        .slow-spin {
+            -webkit-animation: fa-spin 4s infinite linear;
+            animation: fa-spin 3s infinite linear;
+        }
+
+
+        #foggy {
+            padding-top: 55px;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            z-index: 99;
+            background-color: grey;
+            opacity: 0.7;
+        }
+        #message_box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 20em;
+            height: 5em;
+            margin-top: -5em;
+            margin-left: -5em;
+            border: 2px solid lightgrey;
+            border-radius: 7px;
+            background-color: grey;
+            z-index:100;
+        }
+
+    </style>
+{% endblock %}
+
+{% block head %}
+    <link rel="stylesheet" href="{% static '/css/utils.css' %}" type="text/css" />
+    <script type="text/javascript" src="{% static '/js/download_utils.js' %}"></script>
+{% endblock %}
+
+{% block body %}
+<div id="foggy">
+    <div id="message_box">
+        <div class="text-center" style="margin-top:1.5em; margin-bottom: auto">
+            <p id="message_box_text" style="color:white"></p>
+        </div>
+    </div>
+</div>
+<script>
+    $('#foggy').hide();
+</script>
+<div class="container upload-container">
+	<div class="inner-upload">
+		{% if not_computed %}
+		<h3>We could not find a network for you. Please go back to <a href="{% url 'upload' %}"><i class="fa fa-upload fa-fw" aria-hidden="true"></i>&nbsp;Upload</a> and compute one</h3>
+			<p style="margin-right: 5%; margin-left: 5%">
+		Please go back to <a href="{% url 'upload' %}">Upload</a> and generate a network if you haven't done so yet.
+		Otherwise, please make sure all computations have been finished <a href="{% url 'upload-pending' %}">here</a>.<br>
+				In case you used LINEX more than {{ timeout }} minutes ago your session has expired and your data has already been deleted.<br>
+				If you see this message even though your network computation just finished, please contact us via email
+				(See the <a href="{% url 'about' %}"><i class="fa fa-info-circle fa-fw" aria-hidden="true"></i>&nbsp;About</a> page).
+			</p>
+		<p></p>
+		{% else %}
+		<h2>Download for LINEX version {{ version }}</h2>
+            {% comment %}
+            <h4 style="color: #ff9900">
+                We are currently experiencing issues with zip-file downloads.
+                If possible, please download files individually.
+                We are working on a solution to fix the issue.
+            </h4>
+            {% endcomment %}
+            <div class="accordion" id="filesTab">
+                <div class="card">
+                    <div class="card-header" id="headingFiles">
+                        <h5 class="mb-0" style="background: none">
+                            <button class="btn btn-link" type="button" data-toggle="collapse"
+                                    data-target="#filesOpts" aria-expanded="true" aria-controls="filesOpts"
+                                    style="color: #595959; font-size: 14pt">
+                                <i class="fa" aria-hidden="true"></i> Data and Network .html Download
+                            </button>
+                        </h5>
+                    </div>
+                    <div id="filesOpts" class="collapse show" aria-labelledby="headingFiles"
+                         data-parent="#filesTab">
+                        <div class="card-body">
+                            <form id="main_download" action="{% url 'download' %}" method="GET" enctype="multipart/form-data">
+                                <!-- networks -->
+                                {% for field in network_form %}
+                                    <div style="padding-top: 10px; padding-bottom: 10px">
+                                        {{ field.errors }}
+                                        {{ field }} {{ field.label }}
+                                        {% if field.help_text %}
+                                        <p class="help">{{ field.help_text|safe }}</p>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                                <!-- statistics -->
+                                {% for field in stats_form %}
+                                    <div style="padding-top: 10px; padding-bottom: 10px">
+                                        {{ field.errors }}
+                                        {{ field }} {{ field.label }}
+                                        {% if field.help_text %}
+                                        <p class="help">{{ field.help_text|safe }}</p>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                                <!-- LipidLynxX -->
+                                {% for field in lynx_form %}
+                                    <div style="padding-top: 10px; padding-bottom: 10px">
+                                        {{ field.errors }}
+                                        {{ field }} {{ field.label }}
+                                        {% if field.help_text %}
+                                        <p class="help">{{ field.help_text|safe }}</p>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                                <button type="submit" style="margin-bottom:40px; margin-top:20px"><i class="fa fa-download fa-fw" aria-hidden="true"></i>&nbsp;Download Selected Data</button>
+                            </form>
+                        </div>
+                    </div>
+                    <script>
+                        $('.collapse').collapse();
+                        $('#main_download').submit(function(event) {
+                            try {
+                                document.getElementById('foggy').style.display = 'inline';
+                                document.getElementById('message_box_text').innerHTML =
+                                    '<i class="fa fa-spinner slow-spin fa-fw" style="color: #0065bd"></i>&nbsp; Preparing Download...';
+                                event.preventDefault();
+                                let data = {};
+                                for (const field of this.elements) {
+                                    data[field.name] = field.checked;
+                                }
+                                mainDownload("{% url 'download' %}", data);
+                            } catch (e) {
+                                document.getElementById('foggy').style.display = 'none';
+                                window.alert('Request to served failed. Please try again or contact the developers if the issues persists');
+                            }
+                        });
+                    </script>
+                </div>
+            </div>
+        {% endif %}
+            <div class="accordion" id="pdfTab">
+                <div class="card">
+                    <div class="card-header" id="headingpdf">
+                        <h5 class="mb-0" style="background: none">
+                            <button class="btn btn-link" type="button" data-toggle="collapse"
+                                    data-target="#pdfOpts" aria-expanded="true" aria-controls="pdfOpts"
+                                    style="color: #595959; font-size: 14pt">
+                                <i class="fa" aria-hidden="true"></i> Download pdf-view from JSON
+                            </button>
+                        </h5>
+                    </div>
+                    <div id="pdfOpts" class="collapse show" aria-labelledby="headingpdf"
+                         data-parent="#pdfTab">
+                        <div class="card-body">
+                            <form id="json_download" action="{% url 'download' %}" method="POST" enctype="multipart/form-data">
+                                {% csrf_token %}
+                                <p>{{ json_form.json_file.non_field_errors }}</p>
+                                <p>{{ json_form.json_file.label_tag }} {{ json_form.json_file.help_text }}</p>
+                                <p>{{ json_form.json_file.errors }} {{ json_form.json_file }}</p>
+                                <br>
+                                <p>{{ json_form.font_size.non_field_errors }}</p>
+                                <p>{{ json_form.font_size.label_tag }} {{ json_form.font_size.help_text }}</p>
+                                <p>{{ json_form.font_size.errors }} {{ json_form.font_size }}</p>
+                                <button type="submit" style="margin-bottom:40px; margin-top:20px"><i class="fa fa-download fa-fw" aria-hidden="true"></i>&nbsp;Download pdf</button>
+                            </form>
+                        </div>
+                    </div>
+                    <script>
+                        $('.collapse').collapse();
+                        // $('#json_download').submit(function(event) {
+                        //     try {
+                        //         document.getElementById('foggy').style.display = 'inline';
+                        //         document.getElementById('message_box_text').innerHTML =
+                        //             '<i class="fa fa-spinner slow-spin fa-fw" style="color: #0065bd"></i>&nbsp; Preparing Download...';
+                        //         event.preventDefault();
+                        //         let formData = new FormData(this);
+                        //         // formData.append('json_file', this.elements['json_file'].files[0]);
+                        //         $.ajaxSetup({
+                        //             beforeSend: function(xhr) {
+                        //                 xhr.setRequestHeader("X-CSRFToken", getCookie('csrftoken'))
+                        //             }
+                        //         });
+                        //         $.ajax({
+                        //             url: this.action,
+                        //             type: 'POST',
+                        //             cache: false,
+                        //             processData: false,
+                        //             contentType: false,
+                        //             responseType: 'arraybuffer',
+                        //             xhrField:{
+                        //                 responseType: 'blob'
+                        //             },
+                        //             data: formData,
+                        //             success: function (response, status, xhr) {
+                        //                 let filename = getFileName(xhr);
+                        //                 complete_download(
+                        //                     response, xhr.getResponseHeader("Content-Type"), filename
+                        //                 );
+
+                        //                 document.getElementById('foggy').style.display = 'none';
+                        //             },
+                        //             error: function (response) {
+                        //                 document.getElementById('foggy').style.display = 'none';
+                        //                 window.alert('Something went wrong while generating the pdf');
+                        //             }
+                        //         });
+                        //     } catch (e) {
+                        //         document.getElementById('foggy').style.display = 'none';
+                        //         console.error(e);
+                        //         window.alert('Upload of json data failed. Are you sure you uploaded the correct file format?');
+                        //     }
+                        // });
+                    </script>
+                </div>
+            </div>
+
+		<p><b>Download the
+            <a href="{% static 'lipid_class_colour_scheme.xlsx'%}"
+               download="lipid_class_colour_scheme.xlsx">LINEX lipid class color scheme
+            </a>
+        </b></p>
+        <p><b>Download the
+            <a href="https://github.com/lipitum/linex2_package/-/raw/master/linex2/data/default_fatty_acids.txt?inline=false"
+            download="default_fatty_acids.txt">LINEX default fatty acids
+            </a>
+        </b></p>
+
+        <p> Please cite one of the following papers if you use LINEX: <br>
+            <ul>
+                <!-- UPDATE PUBLICATIONS ALSO ON ABOUT & UPLOAD  PAGE -->
+                <li>
+                    LINEX version 2: <a href="https://doi.org/10.1093/bib/bbac572">Rose and Köhler et al.
+                    <b>Lipid network and moiety analysis for revealing enzymatic dysregulation and mechanistic alterations from lipidomics data</b>.
+                    <i>Briefings in Bioinformatics</i> <b>2023</b>, bbac572</a> <br>
+                </li>
+                <li> LINEX version 1: <a href="https://doi.org/10.3390/metabo11080488">Köhler and Rose et al. <b>Investigating Global Lipidome Alterations with the Lipid Network Explorer</b>.
+                    <i>Metabolites</i> <b>2021</b>, 11, 488</a> <br>
+                </li>
+
+            </ul>
+        </p>
+	</div>
+</div>
+{% endblock %}

@@ -1,0 +1,946 @@
+{% extends 'lipid_network/base.html' %}
+
+
+<html lang="en">
+{% if to_string %}
+{% block style %}
+    <style>
+        {{ css }}
+    </style>
+{% endblock %}
+{%  endif %}
+
+{% block head %}
+	<!-- parts of visjs utilities are adapted from pyvis
+		 Copyright (c) 2018, West Health Institute
+		 All rights reserved.
+	-->
+    {% load static %}
+	<!-- general vis utilities -->
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.16.1/vis.css" type="text/css" />
+    {%  if not to_string %}
+    <link rel="stylesheet" href="{% static '/css/utils.css' %}" type="text/css" />
+    <link rel="stylesheet" href="{% static '/css/analysis.css' %}" type="text/css" />
+    {% endif %}
+	<script
+        type="text/javascript"
+        src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.16.1/vis-network.min.js"
+		integrity="sha512-Qt44lNm1PrILAL/XBsQYyaVBjZJ0YwuzP2p5MbbuI6OFf39JmLqFEUVQb+5OMx/I8dT06jGu2tLEx6bYGM49Sw=="
+		crossorigin="anonymous" referrerpolicy="no-referrer">
+    </script>
+    <script src='https://cdn.plot.ly/plotly-2.4.2.min.js'></script>
+    {%  if not to_string %}
+        <!-- custom vis utilities -->
+        <script type="text/javascript" src="{% static '/js/download_utils.js' %}"></script>
+        <script type="text/javascript" src="{% static '/js/utils.js' %}"></script>
+        <script type="text/javascript" src="{% static '/js/network_to_json.js' %}"></script>
+        <script type="text/javascript" src="{% static '/js/enrichment_utils.js' %}"></script>
+        <script type="text/javascript" src="{% static '/js/analysis.js' %}"></script>
+    {%  endif %}
+
+	<script>
+        function get_json_network(enrichment=null, component=null, enrichment_network=false) {
+            {% if version == 1 %}
+            return(
+                writeNetwork(
+                    nodes, edges, network, {{ version }}, true,
+                    legendNodeColours, legendEdgeColours,
+                    legendNodeSizes,
+                    colourLegend, sizeLegend
+                )
+            );
+            {% else %}
+            if (enrichment_network) {
+                try {
+                    return(writeEnrichment(enrichment, component));
+                } catch (error) {
+                    return null;
+                }
+            }
+            else {
+                return(
+                    writeNetwork(
+                        nodes, edges, network, {{ version }}, true,
+                        legendNodeColours, legendEdgeColours,
+                        legendNodeSizes,
+                        colourLegend, sizeLegend,
+                        document.getElementById('network_type').value
+                    )
+                );
+            }
+            {% endif %}
+        }
+
+		// utility for downloading pdf
+		function send_pdf_request(enrichment=null, component=null, enrichment_network=false) {
+			let request = new XMLHttpRequest();
+            request.open('POST', '{% url "pdf-download" %}', true);
+            let csrftoken = getCookie('csrftoken');
+            request.setRequestHeader("X-CSRFToken", csrftoken);
+			request.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+			request.responseType = 'blob';
+
+			request.onload = function (e) {
+				processResponse(this, request);
+			};
+			request.onreadystatechange = function () {
+			    // catching errors in the responses, that might cause the disabled status to freeze
+			    if (request.status !== 200 && request.readyState === 4) {
+			        window.alert('Unknown error while generating pdf view');
+                }
+            }
+            let enrichment_data = get_json_network(enrichment, component, enrichment_network);
+            {% if version == 1 %}
+            request.send(enrichment_data);
+            {% else %}
+            if (enrichment_network && enrichment_data === null) {
+                console.log("Error occurred in: 'writeEnrichment'");
+                console.error(error);
+                window.alert('Download failed, please try again or contact the developers if the issue remains');
+            }
+            else {
+                request.send(enrichment_data);
+            }
+            {% endif %}
+		}
+
+		function getNetworkJSON(enrichment=null, component=null, enrichment_network=false) {
+            let enrichment_data = get_json_network(enrichment, component, enrichment_network);
+            {% if version == 2 %}
+            if (enrichment_network && enrichment_data === null) {
+                console.log("Error occurred in: 'writeEnrichment'");
+                console.error(error);
+                window.alert('Download failed, please try again or contact the developers if the issue remains');
+                return;
+            }
+            {% endif %}
+            let btn = document.createElement('a');
+            btn.setAttribute("href", "data:text/json;charset=utf-8," + encodeURIComponent(enrichment_data));
+            if (enrichment_network)  {
+                btn.setAttribute("download", "LINEX_enrichment.json");
+            }
+            else btn.setAttribute("download", "LINEX_network.json");
+            document.body.appendChild(btn);
+            btn.click();
+            btn.remove();
+        }
+        let current_network = "native";
+        {% if to_string %}
+            {{ js|safe }}
+            let to_string = true;
+        {% else %}
+            let to_string = false;
+        {%  endif %}
+
+        {% if networks %}
+        let network_dict = {{ networks|safe }};
+        {% endif %}
+        let enrichment_progress;
+        let enrichment_subnetworks = {{ enrichments|safe }};
+        let latest_enrichment;
+        let enrichment_vis_nodes = {};
+        let enrichment_vis_edges = {};
+        let enrichment_vis_networks = {};
+        let enrichment_vis_options = {
+            'width': '100%',
+            'height': '100%',
+            'physics': false
+        };
+        let enrichment_vis_scores = {};
+        let enrichment_vis_scores_plots = {};
+        let enrichment_vis_scores_options = {};
+        let enrichment_pvalues = {};
+	</script>
+{% endblock %}
+
+{% block body %}
+    <div id="foggy">
+        <div id="message_box">
+            <div class="text-center" style="margin-top: .85em; margin-bottom: auto">
+                <p id="message_box_text" style="color:white; margin: auto"></p>
+            </div>
+        </div>
+    </div>
+    <script>
+        $("#foggy").hide();
+    </script>
+	{% if missing %}
+        <div class="container upload-container">
+            <div class="inner-upload">
+                <h3>
+                    We could not find a network for you. Please go back to <a href="{% url 'upload' %}"><i class="fa fa-upload fa-fw" aria-hidden="true"></i>&nbsp;Upload</a> and compute one
+                </h3>
+                <p>
+                Please make sure all computations have been finished <a href="{% url 'upload-pending' %}">here</a>.<br>
+                    In case you used LINEX more than {{ timeout }} minutes ago your session has expired and your data has already been deleted.<br>
+                    If you see this message even though your network computation just finished, please contact us via email
+                    (See the <a href="{% url 'about' %}"><i class="fa fa-info-circle fa-fw" aria-hidden="true"></i>&nbsp;About</a> page).
+                </p>
+            </div>
+        </div>
+	{% else %}
+        <div class="tab" style="padding-top: 55px">
+            <button class="tablinks main-tablink" onclick="showMainTab(event, 'NetworkTab')">
+                Network
+            </button>
+            <button class="tablinks main-tablink" onclick="showMainTab(event, 'EnrichmentTab')">
+                Network Enrichment
+            </button>
+            <button class="tablinks main-tablink" onclick="showMainTab(event, 'SummaryTab')">
+                Lipidome Summary
+            </button>
+            <button class="tablinks main-tablink" disabled style="float: right; padding-top: 0; padding-bottom: 0; font-size: 20pt">
+                Version {{ version }}
+            </button>
+        </div>
+        <!--
+        # ########### #
+        # Network Tab #
+        # ########### #
+        -->
+        <div id="NetworkTab" class="tabcontent main-tab" style="display: block">
+            <div id="lipid_network">
+                <div id="sidebar" class="sidebar">
+                    <h5 class="text-center">Network Options</h5>
+                    <div style="overflow-y: auto; overflow-x: hidden; padding: 5px; height: 95%; border-radius: 7px">
+                        {% if version == 2 %}
+                            <label for="network_type"><b>Network Type</b></label>
+                            <select name="network_type" id="network_type">
+                                <option value="native">Native Network</option>
+                                <option value="bipartite">Enzyme Network</option>
+                                <option value="native_mol">Native Molecular Network</option>
+                                <option value="bipartite_mol">Enzyme Molecular Network</option>
+                            </select>
+                            <button onclick="updateNetworkType()" style="padding-left: 15px; padding-right: 15px">
+                                Recompute Network
+                            </button>
+                            <br>
+                            <hr>
+                        {% endif %}
+                        <!-- node colour options -->
+                        {% if node_colours %}
+                        <label for="node_colours"><b>Node Colours</b></label>
+                        <select name="node_colours" id="node_colours" onchange="updateNodeColour()">
+                            {% for attr, name in node_colours.items %}
+                                <option value="{{ attr }}">{{ name }}</option>
+                            {% endfor %}
+                        </select>
+                        {% endif %}
+
+                        <!-- edge colour options -->
+                        {% if edge_colours %}
+                        <label for="edge_colours"><b>Edge Colours</b></label>
+                        <select name="edge_colours" id="edge_colours" onchange="updateEdgeColour()">
+                            {% for attr, name in edge_colours.items %}
+                                <option value="{{ attr }}">{{ name }}</option>
+                            {% endfor %}
+                        </select>
+                        {% endif %}
+
+                        <!-- node size options -->
+                        {% if node_sizes %}
+                            <label for="node_sizes"><b>Node Sizes</b></label>
+                            <select name="node_sizes" id="node_sizes" onchange="updateNodeSize()">
+                                {% for attr, name in node_sizes.items %}
+                                    <option value="{{ attr }}">{{ name }}</option>
+                                {% endfor %}
+                            </select>
+                            <script>
+                                document.getElementById("node_sizes").value = "chain_length";
+                            </script>
+                        {% endif %}
+
+                        <hr>
+                        <!-- comparison options -->
+                        {% if groups %}
+                        <label for="groups"><b>Comparison</b></label>
+                        <select name="groups" id="groups" onchange="updateComparison()">
+                            {% for comp in groups %}
+                                <option value="{{ comp }}">{{ comp }}</option>
+                            {% endfor %}
+                        </select>
+                        {% endif %}
+
+                        <!-- group options -->
+                        {% if single_groups %}
+                        <label for="single_groups"><b>Group</b></label>
+                        <select name="single_groups" id="single_groups" onchange="updateGroup()">
+                            {% for group in single_groups %}
+                                <option value="{{ group }}">{{ group }}</option>
+                            {% endfor %}
+                        </select>
+                        {% endif %}
+
+                        <hr>
+                        <!-- finding lipid by name -->
+                        <label for="lipid_search" style="margin-top: 25px"><b>Find Lipid Species</b></label>
+                        <input list="nodeLabels" id="lipid_search" style="width: 80%">
+                        <datalist id="nodeLabels"></datalist>
+                        <button onclick="findLipid()" style="padding-left: 15px; padding-right: 15px">Find</button>
+                        <br>
+
+                        <!-- finding lipid by regex -->
+                        <label for="sub_search" style="margin-top: 25px"><b>Find by Substring</b></label>
+                        <input type="text" id="sub_search" style="width: 80%">
+                        <button onclick="findSubLipid()" style="padding-left: 15px; padding-right: 15px">Find</button>
+
+                        <hr>
+                        <!-- Shows all, only class of only FA reactions -->
+                        <br>
+                        <br>
+                        <label for="showEdgeType"><b>Shown reaction types</b></label>
+                        <select name="showEdgeType" id="showEdgeType" onchange="changeShownEdges({{ version }})">
+
+                            <option value="all">all</option>
+
+                            <option value="class">only Class reactions</option>
+
+                            <option value="fa">only FA reactions</option>
+                        </select>
+
+                        <!-- setting significance threshold for border colouring -->
+                        <br>
+                        <br>
+                        <label for="significanceThreshold" style="margin-top: 25px"><b>Significance Threshold</b></label>
+                        <input type="number" id="significanceThreshold" value="0.05" min="0" max="1" step="0.01">
+                        <button onclick="updateCutoff()" style="padding-left: 15px; padding-right: 15px">Update</button>
+                        <br>
+                        <div style="margin-top: 5%">
+                            <label class="switch">
+                                <input type="checkbox" id="significantSwitch" onchange="updateNodeColour()">
+                                <span class="slider round"></span>
+                            </label>
+                            <b>Highlight</b>
+                            <script>
+                                document.getElementById("significantSwitch").checked = true;
+                            </script>
+                        </div>
+
+                        <!-- Physics toggle switch-->
+                        <div>
+                            <label class="switch">
+                                <input type="checkbox" id="physicsswitch" onchange="PhysicsToggle()">
+                                <span class="slider round"></span>
+                            </label>
+                            <b>Enable physics</b>
+                        </div>
+
+                        <!-- Scale switch -->
+                        <div>
+                            <label class="switch">
+                                <input type="checkbox" id="scaleSwitch" onchange="updateScale()">
+                                <span class="slider round"></span>
+                            </label>
+                            <b>Unified Scales</b>
+                        </div>
+
+                        <hr>
+                        <!-- download as pdf option-->
+                        {% if to_string %}
+                        <button type="submit" id="vis_down" style="margin-top: 10%; margin-bottom: 35px;"
+                            onclick="getNetworkJSON()">
+                            <i class="fa fa-download fa-fw" aria-hidden="true"></i>Download View
+                        </button>
+                        <p style="margin-top: -1em">
+                            <i class="fa fa-info-circle fa-fw" aria-hidden="true"></i>Downloads the network as a .json file, which can be uploaded to <a href="http://{{ host }}{% url 'download' %}" target="_blank" rel="noopener noreferrer">{{ host }}{% url 'download' %}</a> to generate a pdf view
+                        </p>
+                        {% else %}
+                        <button type="submit" id="vis_down" style="margin-top: 10%; margin-bottom: 35px;"
+                                onclick="send_pdf_request()">
+                            <i class="fa fa-download fa-fw" aria-hidden="true"></i>Download View
+                        </button>
+                        <p style="margin-top: -1em">
+                            <i class="fa fa-info-circle fa-fw" aria-hidden="true"></i>Downloads the network a pdf view
+                        </p>
+                        {% endif %}
+                        <br>
+                        <!-- Descriptions for fold-changes and significance annotations -->
+                        <p id="srcGroupFcColour"></p>
+                        <p id="tgtGroupFcColour"></p>
+                        <p id="srcGroupFcSize"></p>
+                        <p id="tgtGroupFcSize"></p>
+
+                        <p id="significanceAnnotation"></p>
+                    </div>
+                </div>
+                <div id="network">
+                    <div id="legend">
+                        {% if colour_legend %}
+                        <h5 class="text-center">Legend</h5>
+                        <div style="display: flex; float: left; width: 100%; height: 4%">
+                            <label class="switch" style="margin-right: 2.5%;">
+                                <input type="checkbox" id="legend_nav" onchange="showLegendNavigation()">
+                                <span class="slider round" content="Show Navigation" id="nav_slider"></span>
+                            </label>
+                            <p id="nav_label" style="font-size: .75em; margin-top: 2.5%;">Hide Legend Navigation</p>
+                        </div>
+                        <div id="colour_legend" class="colour_legend">
+                            <script type="text/javascript">
+                                let drawOptions = {{ options|safe }};
+                                if (!drawOptions["interaction"]) {
+                                    drawOptions["interaction"] = {"navigationButtons": true};
+                                } else {
+                                    drawOptions["interaction"]["navigationButtons"] = true;
+                                }
+
+                                let legendNodeColours = new vis.DataSet({{legend_colour_nodes|safe}});
+                                let legendEdgeColours = new vis.DataSet({{legend_colour_edges|safe}});
+                                let colourLegend;
+
+                                colourLegend = drawLegend(
+                                    colourLegend, legendNodeColours,
+                                    legendEdgeColours, drawOptions,
+                                    "colour_legend"
+                                );
+                                colourLegend.setOptions({'interaction': {'multiselect': true}});
+                            </script>
+                        </div>
+                        {% endif %}
+                        {% if size_legend %}
+                        <div id="size_legend">
+                            <script type="text/javascript">
+                                let legendNodeSizes = new vis.DataSet({{legend_size_nodes|safe}});
+                                let legendEdgeSizes = new vis.DataSet({{legend_size_edges|safe}});
+                                let sizeLegend;
+
+                                sizeLegend = drawLegend(
+                                    sizeLegend, legendNodeSizes,
+                                    legendEdgeSizes, drawOptions,
+                                    "size_legend"
+                                );
+                            </script>
+                        </div>
+                    </div>
+                    {% endif %}
+                    <div id="graph" class="graph">
+                        <div id="network_graph">
+                            <h5 class="text-center">Network</h5>
+                            <div id="loadingBar">
+                                <div class="outerBorder">
+                                    <div id="text">0%</div>
+                                    <div id="border">
+                                        <div id="bar"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="visjs">
+                                <script type="text/javascript">
+                                    // NOTE: this part is adapted from pyvis
+                                    // initialize global variables.
+                                    let edges;
+                                    let nodes;
+                                    let network;
+                                    let options, data;
+
+                                    // This method is responsible for drawing the graph, returns the drawn network
+                                    function drawGraph(data_dict=null) {
+                                        document.getElementById('network_graph').hidden = true;
+
+                                        let container;
+                                        container = document.getElementById('visjs');
+
+                                        // parsing and collecting nodes and edges from the python
+                                        if (data_dict === null) {
+                                            nodes = new vis.DataSet({{nodes|safe}});
+                                            edges = new vis.DataSet({{edges|safe}});
+                                        } else {
+                                            nodes = new vis.DataSet(JSON.parse(data_dict['nodes']));
+                                            edges = new vis.DataSet(JSON.parse(data_dict['edges']));
+                                        }
+                                        // adding nodes and edges to the graph
+                                        data = {nodes: nodes, edges: edges};
+                                        options = {{options|safe}};
+                                        options["physics"]["solver"] = "forceAtlas2Based";
+                                        if (options["edges"]["smooth"]["type"] === "curvedCW") {
+                                            options["edges"]["smooth"]["roundness"] = .2;
+                                            options["physics"]["stabilization"]["iterations"] = 100;
+                                        }
+                                        network = new vis.Network(container, data, options);
+
+                                        network.on("stabilizationProgress", function (params) {
+                                            document.getElementById('loadingBar').removeAttribute("style");
+                                            const maxWidth = 496;
+                                            const minWidth = 20;
+                                            const widthFactor = params.iterations / params.total;
+                                            const width = Math.max(minWidth, maxWidth * widthFactor);
+
+                                            document.getElementById('bar').style.width = width + 'px';
+                                            document.getElementById('text').innerHTML = Math.round(widthFactor * 100) + '%';
+                                        });
+                                        network.once("stabilizationIterationsDone", function () {
+                                            document.getElementById('text').innerHTML = '100%';
+                                            document.getElementById('bar').style.width = '496px';
+                                            document.getElementById('loadingBar').style.opacity = 0;
+                                            fixNodes();
+                                            fixEdges();
+                                            // really clean the dom element
+                                            setTimeout(function () {
+                                                document.getElementById('loadingBar').style.display = 'none';
+                                            }, 500);
+                                            sizeLegend.moveTo({"scale": network.getScale()})
+                                        });
+                                        document.getElementById("network_graph").hidden = false;
+
+                                        return network;
+                                    }
+                                    drawGraph();
+                                    // generating all colours with the current selection
+                                    if (document.getElementById("node_colours") !== null) {
+                                        updateNodeColour();
+                                    }
+                                    if (document.getElementById("edge_colours") !== null) {
+                                        updateEdgeColour();
+                                    }
+                                    // same as above with sizes
+                                    if (document.getElementById("node_sizes") !== null) {
+                                        updateNodeSize();
+                                    }
+                                    if (document.getElementById("edge_sizes") !== null) {
+                                        updateEdgeSize();
+                                    }
+                                    fitLegend(colourLegend, legendNodeColours);
+                                    // fitLegend(sizeLegend, legendNodeSizes);
+                                    // annotations
+                                    updateAnnotation();
+                                    // keeping the same zoom leven between size legend and network
+                                    network.on("zoom", function(){
+                                        network.moveTo({"scale": network.getScale()})
+                                        sizeLegend.moveTo({"scale": network.getScale()})
+                                    });
+                                    // Greying-out nodes/edges based on legend selection
+                                    colourLegend.on("selectEdge", function(params) {
+                                        fadeUnselectedEdges();
+                                    });
+                                    colourLegend.on("selectNode", function(params) {
+                                        fadeUnselectedNodes();
+                                    });
+                                    // resetting legend position
+                                    colourLegend.on("click", function(params) {
+                                        let opts = {
+                                            'position': colourLegend.getViewPosition()
+                                        };
+                                        fadeUnselectedEdges();
+                                        fadeUnselectedNodes();
+                                        colourLegend.setOptions(opts);
+                                    });
+                                    // options list for node search
+                                    let nodeLabels = "";
+                                    let node;
+                                    for (let i = 0; i < nodes.length; i++) {
+                                        node = nodes.get(i);
+                                        if (node !== null) {
+                                            nodeLabels += "<option value=" + node["label"] + ">";
+                                        }
+                                    }
+                                    document.getElementById("nodeLabels").innerHTML = nodeLabels;
+                                </script>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!--
+        # ############## #
+        # Enrichment Tab #
+        # ############## #
+        -->
+        <!-- TODO: adapt such that enrichments are downloadable -->
+        <div id="EnrichmentTab" class="tabcontent main-tab">
+            {% if version == 1 %}
+                <h2 class="text-center" style="padding-top: 10%;">
+                    Network enrichment is only possible in <b>LINEX version 2</b>!<br>
+                    Please go back to the <a href="{% url 'analysis' %}">upload page</a> and choose LINEX 2 to run an
+                    enrichment on your lipidomics data.
+                </h2>
+            {% elif groups %}
+                <!-- TODO: get request to trigger network enrichment -->
+                <div id="sidebarEnrichment" class="EnrichmentSidebar" style="margin-left: .7%; padding-left: 5px; padding-right: 5px;">
+                    {% if not to_string %}
+                    <!--
+                    Options:
+                    * force recompute
+                    * group1, group2
+                    * ratio vs difference
+                    * advanced
+                        * penalty fa reactions
+                        * min_size
+                        * max_size
+                        * max_iter (with maximum allowed)
+                    -->
+                    <label for="group1"><b>Group 1</b></label>
+                    <select name="group1" id="group1" onchange="hide_chosen_group('group1', 'group2')">
+                        {% for group in single_groups %}
+                            <option value="{{ group }}">{{ group }}</option>
+                        {% endfor %}
+                    </select>
+                    <label for="group2"><b>Group 2</b></label>
+                    <select name="group2" id="group2" onchange="hide_chosen_group('group2', 'group1')">
+                        {% for group in single_groups %}
+                            <option value="{{ group }}">{{ group }}</option>
+                        {% endfor %}
+                        <script>
+                            document.getElementById('group2').selectedIndex = 1;
+                            hide_chosen_group('group1', 'group2');
+                            hide_chosen_group('group2', 'group1');
+                        </script>
+                    </select>
+                    <label for="ratio_diff"><b>Change Type</b></label>
+                    <select name="ratio_diff" id="ratio_diff">
+                        <option value="ratio">Ratio</option>
+                        <option value="difference">Difference</option>
+                    </select>
+                    <label for="force_overwrite">
+                        <input type="checkbox" id="force_overwrite" style="margin-right: 5px">Force Overwrite
+                    </label>
+                    <hr>
+                    <div class="accordion" id="advanced">
+                        <div class="card" style="border-width: 1px; border-style: solid; border-color: black">
+                            <div class="card-header" id="headingStats" style="background-color: #ededeeff">
+                                <h5 class="mb-0" style="background-color: #ededeeff">
+                                    <button class="btn btn-link" type="button" data-toggle="collapse"
+                                            data-target="#advancedOpts" aria-expanded="true" aria-controls="advancedOpts"
+                                            style="color: #595959; font-size: 14pt">
+                                        <i class="fa" aria-hidden="true"></i> Advanced Options
+                                    </button>
+                                </h5>
+                            </div>
+                            <div id="advancedOpts" class="collapse show" aria-labelledby="headingStats"
+                                 data-parent="#advancedTab">
+                                <div class="card-body" style="padding: 10px">
+                                    <label>FA Reaction Penalty<input id="fa_penalty" type="number" value="0.5" style="margin-left: 5px; max-width: 70px"></label>
+                                    <br>
+                                    <label>Enzyme number Penalty<input id="nreac_penalty" type="number" value="2" style="margin-left: 5px; max-width: 70px"></label>
+                                    <br>
+                                    <label>(<a href="https://en.wikipedia.org/wiki/Simulated_annealing">Sim. Ann.</a>) Temperature<input id="temp" type="number" min="1" max="1000" value="30" style="margin-left: 5px; max-width: 70px"></label>
+                                    <br>
+                                    <br>
+                                    <p>
+                                        Sizes of converted reaction network (NOT lipid network).
+                                    </p>
+                                    <label>Min. Size<input id="min_size" type="number" min="0" max="1000" value="5" style="margin-left: 5px; max-width: 70px"></label>
+                                    <br>
+                                    <label>Max. Size<input id="max_size" type="number" min="10" max="1000" value="20" style="margin-left: 5px;max-width: 70px"></label>
+                                    <br>
+                                    <label>Max. Iterations<input id="max_iter" type="number" min="10" max="1000" value="100" style="margin-left: 5px; max-width: 70px"></label>
+                                </div>
+                            </div>
+                            <script>
+                                $('.collapse').collapse()
+                            </script>
+                        </div>
+                    </div>
+                    <hr>
+                    <button type="submit" id="compute_enrichment" style="margin-top: 10%; margin-bottom: 35px;"
+                                onclick="computeEnrichment('{% url 'enrichment' %}')">
+                            Compute Enrichment
+                    </button>
+                    <hr>
+                    <button type="submit" id="compute_enrichment" style="margin-top: 10%; margin-bottom: 35px;"
+                                onclick="getLionLists('{% url 'lion-download' %}')">
+                            <i class="fa fa-download fa-fw" aria-hidden="true"></i>Download Lion Target List
+                    </button>
+                    <hr>
+                    {% else %}
+                        <p>
+                            Enrichment settings not available in downloaded file
+                        </p>
+                    {% endif %}
+                </div>
+                <div id="contentEnrichment" style="margin-left: 14%">
+                <!-- Enrichment tabs -->
+                    <div class="tab" style="overflow-x: scroll; height: 65px; display: inline-table">
+                    {% for group in enrichment_groups %}
+                        <!-- all buttons are disabled by default => enable once computed -->
+                        <button class="tablinks enrichment-link" id="{{ group|safe }}_ETabLink"
+                                onclick="showEnrichmentSubnetwork(event, '{{ group|safe }}')">
+                        </button>
+                        <!-- TODO: make this nicer by sending group names from backend -->
+                        <script>
+                            document.getElementById("{{ group|safe }}_ETabLink").innerHTML =
+                                formatGroupString("{{ group|safe }}");
+                            document.getElementById("{{ group|safe }}_ETabLink").hidden = true;
+                        </script>
+                    {% endfor %}
+                    </div>
+                    {% for group in enrichment_groups %}
+                        <div id="{{ group|safe }}_ETab" class="tabcontent enrichment-tab">
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        <script>initComputedEnrichments();</script>
+        </div>
+        <!--
+        # ################ #
+        # Lipidome Summary #
+        # ################ #
+        -->
+        <div id="SummaryTab" class="tabcontent main-tab">
+            {% if version == 1 %}
+                <h2 class="text-center" style="padding-top: 10%;">
+                    Network enrichment is only possible in <b>LINEX version 2</b>!<br>
+                    Please go back to the <a href="{% url 'analysis' %}">upload page</a> and choose LINEX 2 to run an
+                    enrichment on your lipidomics data.
+                </h2>
+            {% else %}
+            <div>
+                <div class="tab">
+                    <!-- lipid class, sum length sums etc. -->
+                    <button class="tablinks summary-link" id="generalSummaryLink"
+                            onclick="showSummaryTab(event, 'generalSummaryTab')">
+                        Lipidome Overview
+                    </button>
+                    <!-- substructure analysis -->
+                    <button class="tablinks summary-link" id="substructureLink"
+                            onclick="showSummaryTab(event, 'substructureTab')">
+                        Substructure Analysis
+                    </button>
+                    <!-- chain length analysis -->
+                    <button class="tablinks summary-link" id="substructureLink"
+                            onclick="showSummaryTab(event, 'chainLengthTab')">
+                        Chain Length Analysis
+                    </button>
+                </div>
+                <div id="generalSummaryTab" class="tabcontent summary-tab">
+                    <!-- lipid class plot -->
+                    <button type="submit" onclick="downloadClassPlot('{% url 'summary-download' %}')">
+                        Download Lipidome Summary Data</button>
+                    <div class="EnrichmentComponent">
+                        <div class="enrichmentScore" id="class_plot" style="width: 95vw">
+                            <script>
+                                let class_plot_data = {{ lipid_class_plot|safe }};
+                                let class_plot_layout = {{ lipid_class_layout|safe }};
+                                let config = {'responsive': true};
+                                Plotly.newPlot('class_plot', class_plot_data, class_plot_layout, config);
+                            </script>
+                        </div>
+                    </div>
+                    <!-- C vs. DB Scatter Plot -->
+                    <div class="EnrichmentComponent">
+                        <div class="enrichmentScore" id="c_db_plot" style="width: 95vw; height: 150vh">
+                            <script>
+                                let c_db_plot_data = {{ c_db_plot|safe }};
+                                let c_db_plot_layout = {{ c_db_layout|safe }};
+                                Plotly.newPlot('c_db_plot', c_db_plot_data, c_db_plot_layout, config);
+                            </script>
+                        </div>
+                    </div>
+                    <!-- sum length plot -->
+                    <div class="EnrichmentComponent">
+                        <div class="enrichmentScore" id="sum_length_plot"  style="width: 95vw; height: 150vh">
+                            <script>
+                                let length_plot_data = {{ sum_length_plot|safe }};
+                                let length_plot_layout = {{ sum_length_layout|safe }};
+                                Plotly.newPlot('sum_length_plot', length_plot_data, length_plot_layout, config);
+                            </script>
+                        </div>
+                    </div>
+                    <!-- db plot -->
+                    <div class="EnrichmentComponent">
+                        <div class="enrichmentScore" id="sum_db_plot" style="width: 95vw; height: 150vh">
+                            <script>
+                                let db_plot_data = {{ sum_db_plot|safe }};
+                                let db_plot_layout = {{ sum_db_layout|safe }};
+                                Plotly.newPlot('sum_db_plot', db_plot_data, db_plot_layout, config);
+                            </script>
+                        </div>
+                    </div>
+                </div>
+                <div id="substructureTab" class="tabcontent summary-tab">
+                    <!-- substructure analysis plots -->
+                    <div class="EnrichmentComponent">
+                        <h5 class="text-center">Substructure Features</h5>
+                        <div style="display: flex">
+                            <div class="enrichmentScore substructure-component" id="substructureHeatmap"
+                                 style="width: 50vw">
+                                <script>
+                                   // TODO: heatmap
+                                   let heatmap_data = {{ full_clustermap.data|safe }};
+                                   let heatmap_layout = {{ full_clustermap.layout|safe }};
+                                   Plotly.newPlot('substructureHeatmap', heatmap_data, heatmap_layout, config);
+                                </script>
+                            </div>
+                            <div class="enrichmentScore substructure-component" id="substructurePCA"
+                                 style="width: 50vw">
+                                <script>
+                                   let pca_data = {{ full_pca_data|safe }};
+                                   let pca_layout = {{ full_pca_layout|safe }};
+                                   Plotly.newPlot('substructurePCA', pca_data, pca_layout, config);
+                                </script>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="EnrichmentComponent">
+                        <h5 class="text-center">Regression-Based Feature Selection</h5>
+                        <div style="width: 80vw; height: 80vh; margin: auto; padding-top: 2.5%; overflow-y: scroll">
+                            <table id="coefficients" class="table">
+                                <thead>
+                                    <tr>
+                                        {% for group in substructure_groups %}
+                                        <th colspan="3">{{ group }}</th>
+                                        {% endfor %}
+                                    </tr>
+                                    <tr>
+                                        {% for group in substructure_groups %}
+                                        <th><b>Feature</b></th>
+                                        <th><b>Coefficient</b></th>
+                                        <th><b>Absolute Coefficient</b></th>
+                                        {% endfor %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% if substructure_groups|length > 1 %}
+                                    {% for row in substructures %}
+                                    <tr>
+                                        {% for feature, coeff, abs_coeff in row %}
+                                        <td>{{ feature }}</td>
+                                        <td>{{ coeff }}</td>
+                                        <td>{{ abs_coeff }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                    {% endfor %}
+                                    {% else %}
+                                        {% for row in substructures %}
+                                            {% for feature, coeff, abs_coeff in row %}
+                                        <tr>
+                                            <td>{{ feature }}</td>
+                                            <td>{{ coeff }}</td>
+                                            <td>{{ abs_coeff }}</td>
+                                        </tr>
+                                            {% endfor %}
+                                        {% endfor %}
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                            <!-- TODO: plot regression results? -->
+                            <script>
+                                $(document).ready(function() {
+                                    $('#coefficients').DataTable( {
+                                        "order": [[2, "desc"]],
+                                        "responsive": true,
+                                        "pageLength": 10,
+                                        "autoWidth": false,
+                                        'searching': true,
+                                        'info': false
+                                    } );
+                                } );
+                            </script>
+                            {% if not to_string %}
+                            <button type="submit"
+                                    onclick="downloadSubstructure('{% url 'substructure-download' %}', false)">
+                                <i class="fa fa-download fa-fw" aria-hidden="true"></i>Download Substructure Data
+                            </button>
+                            <button type="submit"
+                                    onclick="downloadSubstructure('{% url 'substructure-download' %}', true)">
+                                <i class="fa fa-download fa-fw" aria-hidden="true"></i>Download Coefficients
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <br>
+                    <!-- TODO: add full pca and best clustermap -->
+                    <div class="EnrichmentComponent">
+                        <h5 class="text-center">Best Substructure Features</h5>
+                        <div style="display: flex">
+                            <div class="enrichmentScore substructure-component" id="substructureBestHeatmap"
+                                 style="width: 50vw">
+                                <script>
+                                   // TODO: heatmap
+                                   let best_heatmap_data = {{ best_clustermap.data|safe }};
+                                   let best_heatmap_layout = {{ best_clustermap.layout|safe }};
+                                   Plotly.newPlot(
+                                       'substructureBestHeatmap', best_heatmap_data,
+                                       best_heatmap_layout, config
+                                   );
+                                </script>
+                            </div>
+                            <div class="enrichmentScore substructure-component" id="substructureBestPCA"
+                                 style="width: 50vw">
+                                <script>
+                                   let best_pca_data = {{ best_pca_data|safe }};
+                                   let best_pca_layout = {{ best_pca_layout|safe }};
+                                   Plotly.newPlot('substructureBestPCA', best_pca_data, best_pca_layout, config);
+                                </script>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="chainLengthTab" class="tabcontent summary-tab">
+                    <div class="EnrichmentComponent">
+                        <!-- TODO: add description of what positive and negative values mean -->
+                        {% if global_reference != "" %}
+                         <!-- only one computation possible/selected at upload-->
+                        <div class="enrichmentScore chainlength-component" id="chainLengthAnalysis">
+                            <script>
+                               let chainlength_data = {{ chainlength_analysis.plot|safe }};
+                               let chainlength_layout = {{ chainlength_analysis.layout|safe }};
+                               if (chainlength_data.length > 0) {
+                                   Plotly.newPlot(
+                                       'chainLengthAnalysis', chainlength_data, chainlength_layout,
+                                       config
+                                   );
+                               } else {
+                                   document.getElementById('chainLengthAnalysis').innerHTML =
+                                       '<h4 class="text-center" style="margin-top: 5%">No Chain Length Data Found</h4>'
+                               }
+                            </script>
+                        </div>
+                        {% if not to_string %}
+                        <button type="submit" onclick="downloadChainLength('{% url 'chainlength-download' %}', null)">
+                            <i class="fa fa-download fa-fw" aria-hidden="true"></i>Download Chain Length Analysis
+                        </button>
+                        {% endif %}
+                        {% else %}
+                         <!-- multiple computations => tabs -->
+                        <div class="tab">
+                            {% for ref_group in chainlength_analysis.keys %}
+                            <button class="tablinks chainlength-link" id="{{ ref_group|safe }}_cl"
+                                    onclick="showChainLengthTab(event, '{{ ref_group|safe }}_clTab')">
+                                {{ ref_group|safe }}
+                            </button>
+                            {% endfor %}
+                        </div>
+                        <script>
+                            let chainlength_plots = {};
+                            let chainlength_layouts = {};
+                        </script>
+                        {% for reference_group, cl_data in chainlength_analysis.items %}
+                        <div id="{{ reference_group|safe }}_clTab" class="tabcontent chainlength-tab">
+                            <div class="enrichmentScore chainlength-component"
+                                 id="chainLengthAnalysis_{{ reference_group|safe }}">
+                                <script>
+                                   chainlength_plots["{{ reference_group|safe }}"] = {{ cl_data.plot|safe }};
+                                   chainlength_layouts["{{ reference_group|safe }}"] = {{ cl_data.layout|safe }};
+                                   if (chainlength_plots["{{ reference_group|safe }}"].length > 0) {
+                                       Plotly.newPlot(
+                                           'chainLengthAnalysis_{{ reference_group|safe }}',
+                                           chainlength_plots["{{ reference_group|safe }}"],
+                                           chainlength_layouts["{{ reference_group|safe }}"], config
+                                       );
+                                   } else {
+                                       document.getElementById('chainLengthAnalysis').innerHTML =
+                                           '<h4 class="text-center" style="margin-top: 5%">' +
+                                           'No Chain Length Data Found for Reference Group ' +
+                                           '{{ reference_group }}' +
+                                           '</h4>'
+                                   }
+                                </script>
+                                {% if not to_string %}
+                                <button type="submit"
+                                        onclick="downloadChainLength('{% url 'chainlength-download' %}', '{{ reference_group|safe }}')">
+                                    <i class="fa fa-download fa-fw" aria-hidden="true"></i>Download Chain Length Analysis
+                                </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+	{% endif %}
+</html>
+{% endblock %}

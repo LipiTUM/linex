@@ -1,0 +1,464 @@
+.slow-spin {
+    -webkit-animation: fa-spin 4s infinite linear;
+    animation: fa-spin 3s infinite linear;
+}
+
+body {
+    background-color: #ededeeff;
+}
+
+::-webkit-scrollbar {
+    border-radius: 7px;
+}
+
+/*
+some elements are adapted from pyvis
+Copyright (c) 2018, West Health Institute
+All rights reserved.
+*/
+
+h5 {
+    height: 3%;
+    margin-bottom: .3rem;
+    background-color: #e6f1faff;
+    border-radius: 7px 7px 0 0;
+    vertical-align: middle;
+}
+
+#lipid_network {
+    width: 95%;
+    height: 90vh;
+    position: absolute;
+    padding-left: 2.5%;
+}
+
+#network {
+    width: 90%;
+    height: 90vh;
+    position: relative;
+    left: 15%;
+}
+
+#network_graph {
+    width: 80%;
+    height: 90vh;
+    position: relative;
+    float: right;
+    margin-top: 5px;
+    border-color: #005293ff;
+    border-style: solid;
+    border-width: 2px;
+    border-radius: 7px;
+    background-color: white;
+}
+
+#visjs {
+    width: 100%;
+    height: 95%;
+    position: relative;
+}
+
+#legend {
+    width: 20%;
+    position: absolute;
+    margin-top: 5px;
+    border-color: #005293ff;
+    border-style: solid;
+    border-width: 2px;
+    border-radius: 7px;
+    height: 90vh;
+    margin-left: -2.15%;
+    background-color: white;
+}
+
+/*TODO: make legends collapsable*/
+/*TODO: make colour_legend height dependent on number of non-hidden nodes*/
+#colour_legend {
+    width: 100%;
+    height: 48%;
+    position: relative;
+    float: left;
+    overflow: auto;
+    border-top: 1px solid #ccc;
+    border-bottom: 1px solid #ccc;
+}
+
+#size_legend {
+    width: 100%;
+    height: 43%;
+    position: relative;
+    float: left;
+    overflow: auto;
+}
+
+/*TODO: collapsable sidebar*/
+#sidebar {
+    width: 13%;
+    height: 90vh;
+    position: absolute;
+    border-color: #005293ff;
+    border-style: solid;
+    border-width: 2px;
+    margin-top: 5px;
+    margin-left: -2%;
+    border-radius: 7px;
+    background-color: white;
+}
+
+select {
+    width: 100%;
+    text-overflow: ellipsis;
+    text-align: center;
+    text-align-last: center;
+    -moz-text-align-last: center;
+}
+
+#loadingBar {
+    position: relative;
+    float: right;
+    width: 100%;
+    height: 100vh;
+    background-color: rgba(200,200,200,0.8);
+    -webkit-transition: all 0.5s ease;
+    -moz-transition: all 0.5s ease;
+    -ms-transition: all 0.5s ease;
+    -o-transition: all 0.5s ease;
+    transition: all 0.5s ease;
+    opacity:1;
+}
+
+#bar {
+    position:absolute;
+    top: 0;
+    left: 0;
+    width: 20px;
+    height: 20px;
+    margin: auto auto auto auto;
+    border-radius: 11px;
+    border: 2px solid rgba(30,30,30,0.05);
+    background: rgb(0, 173, 246); /* Old browsers */
+    box-shadow: 2px 0 4px rgba(0,0,0,0.4);
+}
+
+#border {
+    position:absolute;
+    top:10px;
+    left:10px;
+    width:500px;
+    height:23px;
+    margin:auto auto auto auto;
+    box-shadow: 0px 0px 4px rgba(0,0,0,0.2);
+    border-radius:10px;
+}
+
+#text {
+    position:absolute;
+    top:8px;
+    left:530px;
+    width:30px;
+    height:50px;
+    margin:auto auto auto auto;
+    font-size:22px;
+    color: #000000;
+}
+
+div.outerBorder {
+    position:relative;
+    top:400px;
+    width:600px;
+    height:44px;
+    margin:auto auto auto auto;
+    border:8px solid rgba(0,0,0,0.1);
+    background: rgb(252,252,252); /* Old browsers */
+    background: -moz-linear-gradient(top,  rgba(252,252,252,1) 0%, rgba(237,237,237,1) 100%); /* FF3.6+ */
+    background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,rgba(252,252,252,1)), color-stop(100%,rgba(237,237,237,1))); /* Chrome,Safari4+ */
+    background: -webkit-linear-gradient(top,  rgba(252,252,252,1) 0%,rgba(237,237,237,1) 100%); /* Chrome10+,Safari5.1+ */
+    background: -o-linear-gradient(top,  rgba(252,252,252,1) 0%,rgba(237,237,237,1) 100%); /* Opera 11.10+ */
+    background: -ms-linear-gradient(top,  rgba(252,252,252,1) 0%,rgba(237,237,237,1) 100%); /* IE10+ */
+    background: linear-gradient(to bottom,  rgba(252,252,252,1) 0%,rgba(237,237,237,1) 100%); /* W3C */
+    filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#fcfcfc', endColorstr='#ededed',GradientType=0 ); /* IE6-9 */
+    border-radius:72px;
+    box-shadow: 0px 0px 10px rgba(0,0,0,0.2);
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 60px;
+  height: 34px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 26px;
+  width: 26px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+input:checked + .slider {
+  background-color: #0065bd;
+}
+
+input:focus + .slider {
+  box-shadow: 0 0 1px #0065bd;
+}
+
+input:checked + .slider:before {
+  -webkit-transform: translateX(26px);
+  -ms-transform: translateX(26px);
+  transform: translateX(26px);
+}
+
+/* Rounded sliders */
+.slider.round {
+  border-radius: 34px;
+}
+
+.slider.round:before {
+  border-radius: 50%;
+}
+
+div.vis-network-tooltip {
+    background-color: #ededeeff;
+    border-color: #005293ff;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    width: 300px;
+    word-wrap: break-word;
+    white-space: normal;
+}
+
+/* visjs navigation handles */
+div.vis-network div.vis-navigation div.vis-button.vis-up,
+div.vis-network div.vis-navigation div.vis-button.vis-down,
+div.vis-network div.vis-navigation div.vis-button.vis-left,
+div.vis-network div.vis-navigation div.vis-button.vis-right,
+div.vis-network div.vis-navigation div.vis-button.vis-zoomIn,
+div.vis-network div.vis-navigation div.vis-button.vis-zoomOut,
+div.vis-network div.vis-navigation div.vis-button.vis-zoomExtends {
+  background-image: none !important;
+}
+
+div.vis-network div.vis-navigation div.vis-button:hover {
+  box-shadow: none !important;
+}
+
+.vis-button:after {
+  font-size: 2em;
+  color: gray;
+}
+
+.vis-button.vis-up:after {
+    content: '\f106';
+    font-family: FontAwesome;
+}
+
+.vis-button.vis-down:after {
+    content: '\f107';
+    font-family: FontAwesome;
+}
+
+.vis-button.vis-left:after {
+    content: '\f104';
+    font-family: FontAwesome;
+}
+
+.vis-button.vis-right:after {
+    content: '\f105';
+    font-family: FontAwesome;
+}
+
+.vis-button.vis-zoomIn:after {
+    content: "+";
+}
+
+.vis-button.vis-zoomOut:after {
+    content: "−";
+    padding-top: 12px;
+}
+
+.vis-button.vis-zoomExtends:after {
+    content: "\f0b2";
+    font-family: FontAwesome;
+    font-size: 1.5em;
+}
+
+/* key stuff */
+.your-centered-div {
+    width: 560px; /* you have to have a size or this method doesn't work */
+    height: 315px; /* think about making these max-width instead - might give you some more responsiveness */
+
+    position: absolute; /* positions out of the flow, but according to the nearest parent */
+    top: 0; right: 0; /* confuse it i guess */
+    bottom: 0; left: 0;
+    margin: auto; /* make em equal */
+}
+
+/* collapsibles */
+[data-toggle="collapse"] .fa:before {
+    content: "\f139";
+}
+
+[data-toggle="collapse"].collapsed .fa:before {
+    content: "\f13a";
+}
+
+ select option[disabled] {
+    display: none;
+}
+
+/* enrichment network */
+.enrichmentNetwork {
+    width: 100%;
+    height: 55vh;
+    position: relative;
+}
+/* enrichment score */
+.enrichmentScore {
+    width: 80%;
+    height: 55vh;
+    position: relative;
+}
+
+/* container for network + score per component */
+.component {
+    width: 100%;
+    height: 60vh;
+    display: inline-flex;
+}
+
+.EnrichmentSidebar {
+    width: 13%;
+    height: 90vh;
+    position: absolute;
+    border-color: #005293ff;
+    border-style: solid;
+    border-width: 2px;
+    margin-top: 5px;
+    margin-left: -2%;
+    border-radius: 7px;
+    background-color: white;
+}
+
+.EnrichmentComponent {
+    position: relative;
+    margin: 5px;
+    border-color: #005293ff;
+    border-style: solid;
+    border-width: 2px;
+    border-radius: 7px;
+    background-color: white;
+}
+
+#foggy {
+    padding-top: 55px;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    z-index: 99;
+    background-color: grey;
+    opacity: 0.7;
+}
+
+#message_box {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20em;
+    height: 5em;
+    margin-top: -5em;
+    margin-left: -5em;
+    border: 2px solid lightgrey;
+    border-radius: 7px;
+    background-color: grey;
+    z-index:100;
+}
+
+.substructure-component {
+    margin-left: auto;
+    margin-right: auto;
+    overflow-y: scroll;
+    width: 90vw;
+}
+
+.chainlength-component {
+    margin: auto;
+    overflow-y: scroll;
+    width: 90vw;
+    height: 75vh;
+    border-width: 2px;
+    border-radius: 7px;
+    background-color: white;
+}
+
+#coefficients {
+    font-family: Arial, Helvetica, sans-serif;
+    border-collapse: collapse;
+    width: 100%;
+}
+
+#coefficients td, #coefficients th {
+    border: 1px solid #ddd;
+    padding: 5px;
+    text-align: center;
+}
+
+#coefficients tr:nth-child(even){background-color: #f2f2f2;}
+
+#coefficients tr:hover {background-color: #ddd;}
+
+#coefficients th {
+    padding-top: 7px;
+    padding-bottom: 7px;
+    background-color: #6e777e;
+    color: white;
+}
+
+
+/* auxiliaries for easier hide/show of tabs */
+.main-tablink {}
+.main-tab {}
+
+.enrichment-link {}
+.enrichment-tab {
+    height: 85vh;
+    position: relative;
+    margin-top: 5px;
+    border-color: #005293ff;
+    border-style: solid;
+    border-width: 2px;
+    border-radius: 7px;
+    background-color: white;
+}
+
+.summary-link {}
+.summary-tab {}
+
+
+.chainlength-link {}
+.chainlength-tab {
+}

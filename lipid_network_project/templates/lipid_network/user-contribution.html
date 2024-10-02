@@ -1,0 +1,67 @@
+{% extends 'lipid_network/base.html' %}
+{% load static%}
+
+{% block head %}
+    <style>
+        .home {
+            height: 95vh;
+            width: 95%;
+            padding-top: 5%;
+            margin: auto auto;
+        }
+
+        h4 {
+            display: flex;
+            flex-direction: row;
+        }
+
+        h4:after {
+            content: "";
+            flex: 1 1;
+            border-bottom: 1px solid;
+            margin: auto;
+            align-items: left;
+            margin-left: 10px
+        }
+    </style>
+{% endblock %}
+
+{% block body %}
+<div class="container">
+    <h2><i class="fa fa-comment-dots fa-fw" aria-hidden="true"></i>&nbsp;Contribute</h2>
+    <p>
+        LINEX 2 uses curated reactions from the <a href="https://www.rhea-db.org/">Rhea</a> and <a href="https://www.reactome.org/">Reactome</a> databases.
+        We are constantly extending the LINEX reaction and lipid class database, but are happy to take user controbutions into account.
+        If you are an expert in the field or found publications with new information that should be considered, please let us know.
+        <br>
+        <br>
+        Use the following form to submit details about lipid classes and reactions,
+        including references (publications, database identifiers or other), that should be added to LINEX 2.
+        We will consider your contribution and contact you again. So please also leave your email address.
+        <br>
+        <br>
+        You can also reach us via email directly (See the <a href="{% url 'about' %}"><i class="fa fa-info-circle fa-fw" aria-hidden="true"></i>&nbsp;About</a> page).
+    </p>
+    <br>
+
+    <p style="color:green;"><b> {{contrib_success}} </b></p>
+
+    <br>
+    <h3>Contribution Form</h3>
+    <form id="contrib" action="{% url 'user-contribution' %}" method="GET" enctype="multipart/form-data">
+        {% for field in contribform %}
+            <div style="padding-top: 10px; padding-bottom: 10px">
+                {{ field.errors }}
+                {{ field.label }}
+                <br>
+                {{ field }}
+                {% if field.help_text %}
+                <p class="help">{{ field.help_text|safe }}</p>
+                {% endif %}
+            </div>
+        {% endfor %}
+        <button type="submit" style="margin-bottom:40px; margin-top:20px"><i class="fa fa-upload fa-fw" aria-hidden="true"></i>&nbsp;Submit</button>
+    </form>
+</div>
+
+{% endblock %}

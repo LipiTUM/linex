@@ -1,0 +1,58 @@
+# Fatty Acid format types:
+# 18:1 - standard FA
+# 18:1;O - With OH
+# P-18:1 - Ether bond
+# O-18:1;O2 - Ether bond and with OH
+# l18:1;O - LCB
+# Fatty acids for all classes are not considered for specified classes
+
+>Fatty Acids
+Classes:
+14:0
+15:0
+16:0
+16:1
+17:0
+18:0
+18:1
+18:2
+20:0
+20:1
+20:2
+20:3
+20:4
+20:5
+22:4
+22:5
+22:6
+24:6
+
+Classes: SM, Cer
+14:0
+15:0
+16:0
+16:1
+17:0
+18:0
+18:1
+l18:1;2
+18:2
+20:0
+20:1
+20:2
+20:3
+20:4
+20:5
+22:4
+22:5
+22:6
+24:6
+
+
+>Excluded Reactions
+18:2, 18:3
+
+>Reactions
+Elongation: C:2, DB:0, OH:0, lcb
+De-saturation: C:0, DB:1, OH:0, lcb
+Hydroxylation: C:0, DB:0, OH:1, lcb

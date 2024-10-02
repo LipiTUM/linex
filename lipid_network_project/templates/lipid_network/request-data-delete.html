@@ -1,0 +1,14 @@
+{% extends 'lipid_network/base.html' %}
+{% block body %}
+
+<div class="container upload-container">
+    <div class="inner-upload">
+        <h3><i class="fa fa-trash-alt fa-fw" aria-hidden="true"></i>&nbsp;Delete your data</h3>
+        <p>Your data is saved on our the server for {{ timeout }} minutes after upload and will automatically be deleted afterwards.</p>
+        <p>During that time you can make computations and view the networks.</p>
+        <p>You can delete all your data now, by clicking this button:</p>
+	<a href="{% url 'data-deleted' %}"><button>Delete now</button></a>
+    </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,965 @@
+{% extends 'lipid_network/base.html' %}
+{% load static %}
+
+<html lang="en">
+
+{% block head %}
+
+<link rel="stylesheet" href="{% static '/css/analysis.css' %}" type="text/css" />
+<script type="text/javascript" src="{% static '/js/analysis.js' %}"></script>
+
+{% endblock %}
+
+{% block style %}
+<style>
+    table, th, td {
+      border: 1px solid #cccccc;
+      border-collapse: collapse;
+      table-layout: auto;
+      width: 180px;
+      margin: 5px;
+    }
+
+    tr:nth-child(even) {
+        background-color: lightgrey;
+    }
+
+    .left {
+      clear: both;
+      margin-top: -250px;
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container upload-container">
+    <div class="inner-upload">
+        <h1><i class="fa fa-chalkboard-teacher fa-fw" aria-hidden="true"></i>&nbsp;Tutorial - How to use LINEX</h1>
+
+        <div class="tab" style="padding-top: 10px;padding-bottom: 30px">
+            <b>Select a version: </b>
+            <button class="tablinks main-tablink" onclick="showMainTab(event, 'version1Tab')">
+                Version 1
+            </button>
+            <button class="button-green tablinks main-tablink" onclick="showMainTab(event, 'version2Tab')">
+                Version 2
+            </button>
+        </div>
+        <div  id="version1Tab" class="tabcontent main-tab" style="display: block">
+            <h2>Tutorial for LINEX version 1</h2>
+            <br>
+            <h3><i class="fa fa-upload fa-fw" aria-hidden="true"></i>&nbsp;1. Upload </h3>
+            <p> In order to use LINEX version 1 a <b>Lipid data file</b> needs to be uploaded
+                in <b>.csv</b> format (Comma separated values) or <b>.tsv</b> format (Tab separated values).
+                To do so go to the <a href="{% url 'upload' %}">upload</a> page and select version 1.
+                Additionally, a file containing Sample Groups, Lipid Class Settings or Fatty Acid Settings can be uploaded. <br>
+                Structure of the files: </p>
+            <ul>
+                <li><b>Lipid data file</b> (required, .csv or .tsv): <br>
+                    The actual lipidomics measurement. Contains a set of samples for which lipids are quantified.
+                    This can be concentrations or intensities.
+                </li>
+                <li><b>Sample groups</b> (optional, .csv or .tsv): <br>
+                    The sample groups file assigns samples to groups. This can be experimental conditions such as
+                    case & control or patient disease status. These will be used to calculate statistics over samples belonging to one group/condition.
+                    Please make sure sample names are identical to the lipid data file.
+                </li>
+                <li><b>Lipid class settings</b> (optional, .txt): <br>
+                    When a Lipid class settings file is uploaded class connections can be customised and additional lipid classes can be set. <br>
+                    Lipid classes with a different number of fatty acids should only be connected if they have the same head group (e.g. (PC-LPC, DG-TG), because there are no internal checks. <br>
+                    Please make sure to use only <a href="https://github.com/SysMedOs/LipidLynxX">LipidLynxX</a> abbreviations as Lipid classes. The only exception Cholesterol-esters which needs to be referred to as CE instead of ST. <br>
+                    An enzyme can be added to a reaction with a |. (e.g. LPI: PI|MBOAT7 would assign MBOAT7 to catalyse the reaction from a LPI to a PI). Because of this directed enzyme annotation, lipid class connections are treated as <b>un-symmetric</b>.
+                    However, the direction is only considered for enzyme annotation and if a directed graph is drawn (see Section 1.2 for details).<br>
+                    The default lipid class settings can be found <a href="https://github.com/lipitum/linex/-/blob/master/lipid_network_project/lipid_network/LipidNetworkInference/lipid_classes.txt">here</a>.
+                </li>
+                <li><b>Fatty acid settings</b> (optional, .txt): <br>
+                    When a Lipid class settings file is uploaded fatty acids can be defined and specific reactions can be defined and excluded. <br>
+                    Defining fatty acids means only the specified fatty acids can be incorporated into a lipid reaction. This is to avoid naturally unrealistic reactions. Fatty acid annotation has to be in the form: C:DB;OH, where hydroxy groups are optional (default 0)
+                    Possible fatty acids can either be defined for all lipid classes or lipid class specific, by adding the lipid class abbreviation(s) (comma separated) after the 'Classes:' keyword (see below).<br>
+                    Reaction rules are simply set by specifying the changes in chain length, double bonds and hydroxy groups. E.g 'Elongation: C:2, DB:0, OH:0' defines reactions such as 18:0;0 &#8594; 20:0;0 and labels them as 'Elongation'.
+                    Using the 'Excluded Reactions' keyword, specific reactions between a pair of fatty acids, allowed by the general reaction rules set via 'Reactions', can be excluded. The syntax is simply 'FA1, FA2'.<br>
+                    The default fatty acid settings can be found <a href="https://github.com/lipitum/linex/-/blob/master/lipid_network_project/lipid_network/LipidNetworkInference/fatty_acids.txt">here</a>.
+            </ul>
+            <p> The uploaded files should follow the scheme shown in Section 1.1. An <a href="{% static 'example_data.zip' %}"> example lipidomics dataset </a> can be used for testing and exploring.</p>
+
+                <h5>1.1. File formats </h5>
+
+                <table style="float: left">
+                    <caption style="caption-side:top; "> Lipid data file</caption>
+                    <tr>
+                        <th></th>
+                        <th>Lipid1</th>
+                        <th>Lipid2</th>
+                        <th>...</th>
+                    </tr>
+                    <tr>
+                        <th>Sample1</th>
+                        <td>1.2</td>
+                        <td>2.3</td>
+                        <td>...</td>
+                    </tr>
+                    <tr>
+                        <th>Sample2</th>
+                        <td>3.4</td>
+                        <td>4.5</td>
+                        <td>...</td>
+                    </tr>
+                    <tr>
+                        <th>...</th>
+                        <td>...</td>
+                        <td>...</td>
+                        <td>...</td>
+                    </tr>
+                </table>
+
+                <table style="float: left">
+                    <caption style="caption-side:top"> Sample group file </caption>
+                    <tr>
+                        <th></th>
+                        <th>SampleGroup</th>
+                    </tr>
+                    <tr>
+                        <th>Sample1</th>
+                        <td>name1</td>
+                    </tr>
+                    <tr>
+                        <th>Sample2</th>
+                        <td>name2</td>
+                    </tr>
+                    <tr>
+                        <th>...</th>
+                        <td>...</td>
+                    </tr>
+                </table>
+
+                <table style="float: left" style="font-weight:normal">
+                    <caption style="caption-side:top">Lipid class settings </caption>
+                    <tr style="border:none; background-color: white" >
+                        <th style="border:none"> >Class Connections</th>
+                    </tr>
+                    <tr style="border:none; background-color: white" >
+                        <th style="font-weight:normal; border:none" > PC: PE, DG, ... </td>
+                    </tr>
+                    <tr style="border:none; background-color: white">
+                        <th style="font-weight:normal; border:none" > PE: PC, DG, ... </td>
+                    </tr>
+                    <tr style="border:none; background-color: white">
+                        <th style="font-weight:normal; border:none" >...</th>
+                    </tr>
+                    <tr style="border:none; background-color: white">
+                        <th style="border:none"> Class FA Numbers</th>
+                    </tr>
+                    <tr style="border:none; background-color: white">
+                        <th style="font-weight:normal ; border:none"> DG: 2</td>
+                    </tr>
+                        <tr style="border:none; background-color: white">
+                        <th style="font-weight:normal; border:none"> TG: 3</td>
+                    </tr>
+                    <tr style="border:none; background-color: white">
+                        <th style="font-weight:normal; border:none">...</th>
+                    </tr>
+                </table>
+
+                <table style="float: left; width: 340px;">
+                    <caption style="caption-side:top">Fatty acid settings </caption>
+                    <tr style="border:none; background-color: white">
+                        <th style="border:none"> Fatty Acids</th>
+                    </tr>
+                    <tr style="border:none; background-color: white">
+                        <th style="border:none"> Classes: </td>
+                    </tr>
+                    <tr style="border:none; background-color: white">
+                        <th style="font-weight:normal; border:none">18:0</th>
+                    </tr>
+                    <tr style="border:none; background-color: white">
+                        <th style="font-weight:normal; border:none">18:1</th>
+                    </tr>
+                    <tr style="border:none; background-color: white">
+                        <th style="font-weight:normal; border:none" >...</th>
+                    </tr>
+                    <tr style="border:none; background-color: white" >
+                        <th style="border:none"> Classes: SM, Cer, ...</th>
+                    </tr>
+                    <tr style="border:none; background-color: white" >
+                        <th style="font-weight:normal; border:none">18:1;1</th>
+                    </tr>
+                    <tr style="border:none; background-color: white">
+                        <th style="font-weight:normal; border:none" >...</th>
+                    </tr>
+                    <tr style="border: none; background-color: white">
+                        <th style="border:none"> Excluded Reactions</th>
+                    </tr>
+                    <tr style="border:none; background-color: white">
+                        <th style="font-weight:normal ; border:none"> 20:3, 20:4</td>
+                    </tr>
+                        <tr style="border:none; background-color: white">
+                        <th style="font-weight:normal ; border:none">... </td>
+                    </tr>
+                        <tr style="border:none; background-color: white">
+                        <th style="border:none"> Reactions</th>
+                    </tr>
+                        <tr style="border:none; background-color: white">
+                        <th style="font-weight:normal ; border:none"> Elongation: C: 2, DB: 0, OH: 0</td>
+                    </tr>
+                    <tr style="border:none; background-color: white">
+                        <th style="font-weight:normal; border:none">...</th>
+                    </tr>
+                </table>
+
+            <div class="left">
+                <h5>1.2. Computation Options </h5>
+                <p> The default options can be used as a standard. To optimize runtime make sure only the required checkboxes are selected. </p>
+                <input type="checkbox" onclick="return false;">
+                <label>Data is log-transformed</label>
+                <ul>
+                    <li>
+                        Check if the input data is log-transformed. This is important for correct fold-change calculations.
+                    </li>
+                </ul>
+                <input type="checkbox" checked onclick="return false;">
+                <label>Fold-changes as log-ratios</label>
+                <ul>
+                    <li>
+                        Check if the computed fold-changes should be log transformed. It has no effect if the data is already log-transformed (see above)
+                    </li>
+                </ul>
+                <input type="checkbox" onclick="return false;">
+                <label>Convert to LipidLynxX Nomenclature</label>
+                <ul>
+                    <li>It should only be checked if lipid species names are not yet in the LipidLynxX nomenclature. Be aware that converting names may take up to several minutes. Re-conversion of already converted species increases runtime and might throw errors for molecular species.</li>
+                    <li>If you need to convert, please make sure you are following one of the supported notations (see <a href="https://github.com/SysMedOs/LipidLynxX">lynx github</a> at 'Supported lipid notation styles') </li>
+                    <li>To avoid the conversion process multiple times for the same file you can download the converted data ('LipidLynxX Converted Data as .csv') once the network computation has finished.
+                        A list of lipid species with incorrect notations will also be available ('Unconverted Lipid Species') on the download page.</li>
+                </ul>
+                <p> Lipid Resolution </p>
+                <ul>
+                    <li>Setting the highest resolution to consider, this means all lipids with a lower resolution are considered as they are.
+                        If you set the highest resolution to 'Molecular Species', for example, sum species will be kept as such, but sn-specific annotations will only be considered as non sn-specific.
+                        Please only change this parameter if all lipids are sum species or some are confident sn-specific identifications. <br>
+                        Ordered in decreasing resolution: Sn-specific > Molecular Species > Sum species.
+                    </li>
+                </ul>
+                <input type="checkbox" checked onclick="return false;">
+                <label>Correlations/Correlation Changes</label>
+                <ul>
+                    <li>
+                        Check if Correlations/Correlation Changes should be computed. Missing values just skipped.<br>
+                        See node colouring options (Section 3) for a short explanation for how correlation changes are computed and what they mean.<br>
+                        Unsignificant correlations (FDR > .05)  are automatically set to 0.
+                    </li>
+                </ul>
+                <input type="checkbox" checked onclick="return false;">
+                <label>Partial-Correlations/-Correlation Changes</label>
+                <ul>
+                    <li>
+                        Check if Partial-Correlations/-Correlation Changes should be computed. Only possible when there are no missing values.<br>
+                        Partial correlations only consider 'direct' correlation, i.e. without the effect of all other lipids, in contrast to 'regular' correlations which also show indirect relations.<br>
+                        See node colouring options (Section 3) for a short explanation for how partial correlation changes are computed and what they mean.<br>
+                        Unsignificant partial correlations (FDR > .05)  are automatically set to 0 if p-values (from Fisher's z-transform) could be computed.
+                        If the sample to feature ratio is too small p-values cannot be computed and you will be notified by a warning. In this case all partial correlation values are displayed as they are.
+                    </li>
+                </ul>
+                <input type="checkbox" checked onclick="return false;">
+                <label>Fold Change</label>
+                <ul>
+                    <li>
+                        Check if (log) Fold Changes should be computed. Fold changes are computed as groupA/groupB or groupA - groupB respectively.<br>
+                        Positive values indicate higher values in the group named at first position!.
+                    </li>
+                </ul>
+                <p>Reference Group</p>
+                <ul>
+                     <li>
+                         If you uploaded Sample groups and no Reference Group is chosen all pairwise combinations between sample groups will be calculated.<br>
+                         If there are Sample groups uploaded and a Reference Group is given fold-changes, p-values and (partial) correlation changes are computed against the Reference Group.<br>
+                         If did not upload Sample groups this will have no effect.<br>
+                         Please ensure correct spelling (heading and trailing whitespaces are ignored).
+                    </li>
+                </ul>
+                <input type="checkbox" checked onclick="return false;">
+                <label>p-values</label>
+                <ul>
+                    <li>
+                        Check if p-values (binary statistical tests) should be computed.<br>
+                        All p-values are automatically FDR correct using the Benjamini-Hochberg procedure.<br>
+                        If the data is approximately normally distributed t-test should be used to get more powerful results. Otherwise we recommend using rank-based tests (Wilcoxon rank-sum and Mann-Whitney U rank test).
+                        In the case of paired data, we recommend using Wilcoxon's signed rank test.
+                    </li>
+                </ul>
+
+                <input type="checkbox" onclick="return false;">
+                <label>Directed Graph</label>
+                <ul>
+                    <li>
+                        Check if the displayed network should be directed.
+                        This has no effect on statistical measures, but will lead to reaction and enzyme annotation being assigned to a defined reaction direction.<br>
+                        The directed graph option will consume a considerably higher amount of memory and cpu!
+                    </li>
+                </ul>
+
+                <h5>1.3. Upload & compute network </h5>
+                <p>
+                    Check if everything is set correctly and press the button. The computation will start. <br>
+                    The uploaded data can only be used once. If you want to change a Computation option or open a new tab make sure the input data is still selected otherwise it has to be re-uploaded.<br>
+                    Deleting your browser cookies while using LINEX will also lead to a loss of results, because your data is matched by an anonymous session id.<br>
+                    <b>NOTE:</b> if you upload a new dataset all prior results will be lost!
+                </p>
+                <img style="border: 4px solid grey;display:block;margin-left:auto;margin-right:auto;border-radius: 10px;" src="{% static 'images/upload2.png' %}" alt="how it looks like during the network computation" width="500" />
+                <br>
+                When the computation is done a 'View results' button will appear taking you to the analysis page.
+                <br>
+                <br>
+                <h3><i class="fa fa-project-diagram fa-fw" aria-hidden="true"></i>&nbsp;2. Analysis </h3>
+                <img style="border: 4px solid grey;display:block;margin-left:auto;margin-right:auto;border-radius: 10px;" src="{% static 'images/analysis.png' %}" alt="how it looks like during the network computation" width="700" />
+                <br>
+                <br>
+                <h5>2.1. Network Visualisation Parameters</h5>
+                <ul>
+                    <li>Node Colours</li>
+
+                    <li>Edge Colours</li>
+                    <li>Node size</li>
+                    <li>Comparison: defines which comparison (e.g. groupA vs. groupB) will be used for FDR-values, fold-changes and (partial) correlation changes.</li>
+                    <li>Group: defines which group (e.g. groupA) will be used to display (partial) correlation values.</li>
+                    <li>Find Lipid Species</li>
+                    <ul><li> Find Lipid species by its name </li></ul>
+                    <li>Find by Substring</li>
+                    <ul>
+                        <li>Find lipid species by substrings. Supports Regular Expression (see examples below).</li>
+                        <li>PC: will find all lipid species with "PC" in their name (e.g. LPC, PC, PCO etc.)</li>
+                        <li>^PC will find all lipid species whose name is starting with "PC"</li>
+                        <li>^PC|^PE will find all lipid species whose name is starting with "PC" or "PE"</li>
+                        <li>^PC.*16:0 will find all lipid species whose name is starting with "PC" and contains a 16:0</li>
+                    </ul>
+                    <li>Shown reaction types: Select, if all reactions, only lipid class reactions or only fatty acid reactions should be shown.</li>
+                    <li>Enable physics: If enabled, the network layout is computed dynamically. This means, that moving one lipid with the cursor will move the whole netowrk dynamically.</li>
+                </ul>
+                <h5>2.2. Legend</h5>
+                <ul>
+                    <li> Node colours (only) </li>
+                        <ul>
+                            <li> Lipid Classes </li>
+                            <ul>
+                                <li>
+                                    Lipid class colours are pre-defined (see <a href="https://github.com/lipitum/linex/-/blob/master/lipid_network_project/lipid_network/LipidNetworkInference/Network/templates/lipid_colours.json"></a>.
+                                    For a description on how the colour map was generated refer to the LINEX publication.
+                                </li>
+                                <li>
+                                    If you add custom lipid classes not covered by our colour scheme, it will default to a dark grey.
+                                </li>
+                                <li>
+                                    It is currently not possible to choose specific lipid class colour maps
+                                </li>
+                            </ul>
+                            <li>  </li>
+                        </ul>
+                    <li>Edge colours</li>
+                    <ul>
+                        <li> Lipid Reactions: kind of reaction an edge is representing </li>
+                        <ul>
+                            <li> Chain length: change of the number of C atoms </li>
+                            <li> Desaturation: change of the number of double bonds </li>
+                            <li> FA addition: connection of two lipids with the same head group but different numbers of fatty acids </li>
+                            <li> Head Group Modification: head group related reaction between two lipid species with the same fatty acids/sum composition </li>
+                            <li> <b>Attention:</b> when customising fatty acid reactions in which more than one FA property is changed at ones colour annotation will not be accurate anymore </li>
+                        </ul>
+                        <li> Correlations: correlation between the connected lipids<br>Shown correlations are <b>statistically significant</b></li>
+                        <li> Correlation Changes: discrete categories of changes in correlation between two sample groups.<br>'significant' and 'unsignificant' refer to <b>statistical significance</b> </li>
+                        <ul>
+                            <li> negative to positive: significant correlation in both groups, <0 in groupA and >0 groupB </li>
+                            <li> positive to negative: significant correlation in both groups, >0 in groupA and <0 groupB  </li>
+                            <li> significant to unsignificant: significant correlation in groupA, unsignificant in groupB </li>
+                            <li> unchanged significant: significant in both groups, either both >0 or both <0 </li>
+                            <li> unsignificant: unsignificant correlation, i.e. uncorrelated, in both groups </li>
+                            <li> unsignificant to significant: unsignificant in groupA, signicant in groupB </li>
+                        </ul>
+                        <li> Partial Correlations: partial correlation between the connected lipids </li>
+                        <li> Partial Correlation Changes: discrete groups of changes analogous to 'Correlation Changes' </li>
+                    </ul>
+                    <li>Node size <b>or</b> colour</li>
+                        <ul>
+                            <li> -log10(FDR) </li>
+                            <li> Fold Changes </li>
+                            <ul>
+                                <li> Fold changes are computed a groupA/groupB (or groupA - groupB if log-transformed/log-ratios) </li>
+                                <li> If the selected comparison is groupA_groupB positive (log) fold-changes indicate higher values in groupA!</li>
+                            </ul>
+                            <li> Desaturation </li>
+                            <li> Degree (number of edges per node) </li>
+                            <li> C Index </li>
+                            <li> Chain Length </li>
+                            <li> Betweenness Centrality </li>
+                                <ul><li> The Betweenness Centrality quantifies the importance of a node. It indicates how many shortest paths between any couple of nodes in the graphs pass through a node. </li></ul>
+                            <li> Closeness Centrality</li>
+                                <ul><li>The Closeness Centrality indicates the accessibility of a node. It is a measure of the average shortest distance from a node to all other nodes. </li></ul>
+                            <li> DB Index </li>
+                        </ul>
+                </ul>
+                <h5>2.3. Additional Features</h5>
+                <p>
+                    By clicking on nodes or edges in the colour legend all unselected edge/node types will turn grey in the network. Multiple selection by holding ctrl while selecting is possible. To restore all colours simply click on a non-populated spot inside the colour legend area.<br>
+                    The size legend will be scaled according to the network zoom (i.e. re-scaled every time the network is zoomed in or out). For better readibility it is also possible to zoom the size legend individually.<br>
+                    Zooming via mouse scroll and moving nodes with the cursor is supported for both the network and legend elements.
+                    Additional information can be viewed by hovering over edges and nodes.
+                    The current network view can also be downloaded as a pdf file.
+                </p>
+                <h3><i class="fa fa-download fa-fw" aria-hidden="true"></i>&nbsp;3. Download </h3>
+                Choose the desired files to download <br>
+                <img style="border: 4px solid grey;display:block;margin-left:auto;margin-right:auto;border-radius: 10px;" src="{% static 'images/download.png' %}" alt="how it looks like during the network computation" width="500" />
+                <br>
+                <br>
+                <h5>3.1 Network related files</h5>
+                <p> The network can be downloaded as .html file or as .graphml. <br>
+                    The standalone html file can be opened in a browser (locally) and resembles the analysis page with all interactive functions.<br>
+                    Graphml is a general graph storage format. It can be used to import the network into graph tools like Cytoscape in order to generate publication ready plots.<br>
+                    By downloading colour and size legend data the same tools can also be used to create the corresponding legends in a suitable format.<br>
+                    To show the lipid class connections used in your session you can download the corresponding graph as a png image or as a graphml file.
+                </p>
+                <h5>3.2 LipidLynxX related files</h5>
+                <p>
+                    LipidLynxX Converted Data along with a list of incorrectly annotated species names can only be downloaded if the conversion options was checked on the upload page.
+                </p>
+                <h5>3.3 Statistical Metrics</h5>
+                <p>
+                    All computed statistics (as defined on the upload page) can be downloaded as csv files. If sample groups were given one file for each group (or comparison) will be provided.<br>
+                    For (partial) correlations the full correlation matrix is returned, thus also including values for lipid pairs with no (direct) connection in the network.
+                </p>
+                <h5>3.4 Download pdf-view from JSON</h5>
+
+                <img style="border: 4px solid grey;display:block;margin-left:auto;margin-right:auto;border-radius: 10px;"
+                     src="{% static 'images/download_json.png' %}"
+                     alt="Download pdf from JSON" width="500" />
+                <br>
+                <p>
+                    After downloading the standalone html file, the network can be interactively used locally.
+                    If high-quality pdf figures of network views should be generated,
+                    a JSON file can be generated from the standalone pdf file.
+                    These files can be uploaded here and will be converted into a pdf that can be used
+                    e.g. in publications.
+                </p>
+                <h3><i class="fa fa-trash-alt fa-fw" aria-hidden="true"></i>&nbsp;4. Delete Data </h3>
+            <p> Data is saved on the server for {{ timeout }} minutes after upload and will automatically be deleted afterwards, but it can be deleted manually <a href="request-data-delete">here</a> as well.</p>
+            </div>
+        </div>
+
+        <div  id="version2Tab" class="tabcontent main-tab" style="display: block">
+            <h2>Tutorial for LINEX<sup>2</sup></h2>
+            <br>
+            <p> Before working with LINEX<sup>2</sup>, please read the publication to understand the method and application cases of the software.
+                The links can be found on the <a href="{% url 'about' %}"> <i class="fa fa-info-circle fa-fw" aria-hidden="true"></i> About </a> page.
+                This tutorial will walk you through all the steps to analyze lipidomics data with LINEX<sup>2</sup>.</p>
+            <br>
+            <h3><i class="fa fa-vial fa-fw" aria-hidden="true"></i>&nbsp;Lipid nomenclature </h3>
+            <p>
+                LINEX<sup>2</sup> supports the nomenclature used in the <a href="https://swisslipids.org/#/"> Swiss Lipids</a> and <a href="https://www.lipidmaps.org/">LIPID MAPS</a> databases.
+                Examples are: PC(48:4), PS(18:1_20:0), SM(d18:0/18:0), SM(36:1;O2), ... .
+                If your lipidomics data is not compatible with this nomenclature  it is possible to convert the nomenclature in LINEX<sup>2</sup> using <a href="https://github.com/SysMedOs/LipidLynxX">LipidLynxX</a>.
+            </p>
+            <p>
+                LINEX<sup>2</sup> has support for over 100 lipid classes.
+                The latest version of a supported lipid classes is available <a href="https://github.com/lipitum/linex2_package/-/blob/master/linex2/data/standard_lipid_classes.csv">
+                <i class="fa fa-table fa-fw" aria-hidden="true"></i> here</a>.
+                If a lipid class is not available, please contact the developers (<a href="{% url 'about' %}"> <i class="fa fa-info-circle fa-fw" aria-hidden="true"></i> About </a>).
+            </p>
+
+            <br>
+            <h3><i class="fa fa-upload fa-fw" aria-hidden="true"></i>&nbsp;1. Upload </h3>
+            <img style="border: 4px solid grey;display:block;margin-left:auto;margin-right:auto;border-radius: 10px;"
+                 src="{% static 'images/l2_upload.png' %}" alt="The LINEX 2 upload parameters" width="700" />
+            <br>
+            <p> In order to use LINEX<sup>2</sup> a <b>Lipid data file</b> needs to be uploaded
+                in <b>.csv</b> format (Comma separated values) or <b>.tsv</b> format (Tab separated values).
+                To do so go to the <a href="{% url 'upload' %}">upload</a> page and select version 2.
+                Additionally, a file containing Sample Groups, Lipid Class Settings or Fatty Acid Settings can be uploaded. <br>
+                An example for each file can be downloaded <a href="{% static 'example_data.zip'%}" download="example_data.zip"> <i class="fa fa-download fa-fw" aria-hidden="true"></i> here </a>.
+                </p>
+            <p>The requirements for each file are as follows:</p>
+            <ol type="A">
+                <li><b>Lipid data file</b> (required, .csv or .tsv): <br>
+                    The actual lipidomics measurement. Contains a set of samples for which lipids are quantified.
+                    This can be concentrations or intensities.
+                    Labels for samples are required (See schematic in Section 1.1.).
+                </li>
+                <li><b>Sample groups</b> (required, .csv or .tsv): <br>
+                    The sample groups file assigns samples to groups.
+                    This can be experimental conditions such as
+                    case & control or patient disease status.
+                    These will be used to calculate statistics over samples belonging to one group/condition.
+                    This csv or tsv file contains two columns, the first column with the sample names (identical to the sample names in the lipid data file),
+                    and the experimental group, a sample belongs to (See schematic in Section 1.1.).
+                    Please make sure sample names are identical to the lipid data file.
+                </li>
+                <li><b>Fatty acid settings</b> (optional, .txt): <br>
+                    To calculate lipid metabolic networks, LINEX<sup>2</sup> internally requires molecular species of each lipid.
+                    However, lipids are often only identified as sum species (e.g. sum species: <i>PC(34:1)</i> vs.
+                    molecular species <i>PC(16:0_18:1)</i>). In the fatty acid settings file, users can define
+                    (class-specific) fatty acids, of which sum species can be composed.
+                    These are then used to generate potential molecular species of each sum species in the network
+                    generating algorithm.
+                    More provided fatty acids can make lipid networks of sum species lipids more comprehensive,
+                    but increase the runtime.
+                    The file (see schematic in Section 1.1) requires fatty acid definitions after the "> Fatty Acids" tag.
+                    This is followed by The line "Classes:".
+                    After this fatty acids are listed that can be used for all lipid classes to infer molecular species from sum species.
+                    It is also possible so specify Fatty acids that are only used for specific lipid classes.
+                    For example fatty acids for the classes SM and Cer can be listed after the line "Classes: SM, Cer".
+                    Only the fatty acids listed below this line are used to infer molecular species for these classes.
+                    <br>
+                    Another important aspect of the file are fatty acid reactions.
+                    LINEX<sup>2</sup> has the ability to show potential fatty acids reactions such as elongation or desaturation.
+                    These are rule based and defined in the ">Reactions" section of the file.
+                    A fatty acid elongation, in which two carbon atoms are added to the aliphatic chain can be defined like this:
+                    'Elongation: C:2, DB:0, OH:0'.
+                    'Elongation' is a user defined label for the reaction, "C:2" describes an increase of two carbon atoms.
+                    Likewise, desaturations can be defined "C:0. CB:1, OH:0" or hydroxylations "C:0. CB:0, OH:1".
+                    Per default, these fatty acid reactions are not used for long chain bases.
+                    If they should also be applied for them, add ", lcb" at the end on the reaction definition.
+                    Using the '>Excluded Reactions' keyword, specific reactions between a pair of fatty acids,
+                    allowed by the general reaction rules set via 'Reactions', can be excluded.
+                    This might be, since some fatty acid conversions are not possible in some organisms.
+                    The syntax is simply 'Fatty acid 1, Fatty acid 2'.
+                    Please have a look at the <a href="{% static 'example_data.zip'%}" download="example_data.zip"> <i class="fa fa-download fa-fw" aria-hidden="true"></i> default fatty acids file </a> to understand the structure.
+                </li>
+                <li><b>Confirmed lipid species</b> (optional, .txt): <br>
+                    In some experiments, where lipids are quantified as sum species, molecular species are confirmed,
+                    but not quantified.
+                    As explained before, LINEX<sup>2</sup> internally requires molecular species.
+                    If confirmed molecular species are uploaded,
+                    other potential molecular species for their sum species are not computed.
+                    This reduces computation time and makes the networks more accurate by
+                    relying on measured molecular species.
+                </li>
+            </ol>
+            <p> The uploaded files should follow the scheme shown in Section 1.1.
+                An <a href="{% static 'example_data.zip' %}"> example lipidomics dataset </a> can be used for testing and exploring.</p>
+
+            <br>
+                <h5>1.1. File formats </h5>
+
+                <table style="float: left">
+                    <caption style="caption-side:top; ">A. Lipid data file</caption>
+                    <tr>
+                        <th></th>
+                        <th>Lipid1</th>
+                        <th>Lipid2</th>
+                        <th>...</th>
+                    </tr>
+                    <tr>
+                        <th>Sample1</th>
+                        <td>1.2</td>
+                        <td>2.3</td>
+                        <td>...</td>
+                    </tr>
+                    <tr>
+                        <th>Sample2</th>
+                        <td>3.4</td>
+                        <td>4.5</td>
+                        <td>...</td>
+                    </tr>
+                    <tr>
+                        <th>...</th>
+                        <td>...</td>
+                        <td>...</td>
+                        <td>...</td>
+                    </tr>
+                </table>
+
+                <table style="float: left">
+                    <caption style="caption-side:top">B. Sample group file </caption>
+                    <tr>
+                        <th></th>
+                        <th>SampleGroup</th>
+                    </tr>
+                    <tr>
+                        <th>Sample1</th>
+                        <td>name1</td>
+                    </tr>
+                    <tr>
+                        <th>Sample2</th>
+                        <td>name2</td>
+                    </tr>
+                    <tr>
+                        <th>...</th>
+                        <td>...</td>
+                    </tr>
+                </table>
+
+                <table style="float: left; width: 320px;">
+                    <caption style="caption-side:top">C. Fatty acid settings </caption>
+                    <tr style="border:none; background-color: white">
+                        <th style="border:none"> >Fatty Acids</th>
+                    </tr>
+                    <tr style="border:none; background-color: white">
+                        <th style="border:none"> Classes: </td>
+                    </tr>
+                    <tr style="border:none; background-color: white">
+                        <th style="font-weight:normal; border:none">18:0</th>
+                    </tr>
+                    <tr style="border:none; background-color: white">
+                        <th style="font-weight:normal; border:none">18:1</th>
+                    </tr>
+                    <tr style="border:none; background-color: white">
+                        <th style="font-weight:normal; border:none" >...</th>
+                    </tr>
+                    <tr style="border:none; background-color: white" >
+                        <th style="border:none"> Classes: SM, Cer, ...</th>
+                    </tr>
+                    <tr style="border:none; background-color: white" >
+                        <th style="font-weight:normal; border:none">18:1;1</th>
+                    </tr>
+                    <tr style="border:none; background-color: white">
+                        <th style="font-weight:normal; border:none" >...</th>
+                    </tr>
+                    <tr style="border: none; background-color: white">
+                        <th style="border:none"> >Excluded Reactions</th>
+                    </tr>
+                    <tr style="border:none; background-color: white">
+                        <th style="font-weight:normal ; border:none"> 20:3, 20:4</td>
+                    </tr>
+                        <tr style="border:none; background-color: white">
+                        <th style="font-weight:normal ; border:none">... </td>
+                    </tr>
+                        <tr style="border:none; background-color: white">
+                        <th style="border:none"> >Reactions</th>
+                    </tr>
+                        <tr style="border:none; background-color: white">
+                        <th style="font-weight:normal ; border:none"> Elongation: C: 2, DB: 0, OH: 0</td>
+                    </tr>
+                    <tr style="border:none; background-color: white">
+                        <th style="font-weight:normal; border:none">...</th>
+                    </tr>
+                </table>
+
+                <table style="float: left; width: 200px;">
+                    <caption style="caption-side:top">D. Confirmed species</caption>
+                    <tr style="border:none; background-color: white">
+                        <th style="font-weight:normal; border:none">PC(16:0_18:1)</th>
+                    </tr>
+                    <tr style="border:none; background-color: white">
+                        <th style="font-weight:normal; border:none">PC(18:1_18:1)</th>
+                    </tr>
+                    <tr style="border:none; background-color: white">
+                        <th style="font-weight:normal; border:none">DG(20:0_20:4)</th>
+                    </tr>
+                    <tr style="border:none; background-color: white">
+                        <th style="font-weight:normal; border:none">...</th>
+                    </tr>
+                </table>
+
+            <div class="left">
+                <h5>1.2. Computation Options </h5>
+                <p> The default options can be used as a standard.
+                    To optimize runtime make sure only the required checkboxes are selected. </p>
+                <ol type="1" start="0">
+                    <li><b>Lipids are columns</b><br>
+                        Define if in the uploaded lipidomics data the lipids are in columns or rows.
+                    </li>
+                    <li><b>Data is log-transformed</b><br>
+                        Check if the input data is log-transformed. This is important for correct fold-change calculations.
+                    </li>
+                    <li><b>Fold-changes as log-ratios</b><br>
+                        Check if the computed fold-changes should be log transformed.
+                        It has no effect if the data is already log-transformed (see above).
+                    </li>
+                    <li><b>Convert to LipidLynxX Nomenclature</b><br>
+                        It should only be checked if lipid species names are not yet in the LipidLynxX nomenclature.
+                        Be aware that converting names may take up to several minutes.
+                        Re-conversion of already converted species increases runtime and might throw errors for molecular species.
+                        If you need to convert,
+                        please make sure you are following one of the supported notations
+                        (see <a href="https://github.com/SysMedOs/LipidLynxX">lynx github</a>
+                        at 'Supported lipid notation styles')
+                        To avoid the conversion process multiple times for the same file,
+                        you can download the converted data ('LipidLynxX Converted Data as .csv') once the network computation has finished.
+                        A list of lipid species with incorrect notations will also be available
+                        ('Unconverted Lipid Species') on the download page.
+                    </li>
+                    <li><b>Database options</b><br>
+                        LINEX<sup>2</sup> used curated lipid-metabolic reactions from the Rhea and Reactome databases.
+                        Users can choose if both or just one of the databases should be used to compute the lipid network.
+                        If Reactome is chosen, a (supported) species has to be entered (3-letter code).
+                        The list of all supported species can be found
+                        <a href="https://reactome.org/content/schema/objects/Species">here</a>.
+                    </li>
+                    <li><b>Ether conversions</b><br>
+                        LINEX<sup>2</sup> can show connections in the network between ether and non-ether lipids
+                        (e.g. <i>PC(18:0_18:1) &#8594; PC(O-18:0_18:1)</i>).
+                        Not all of these potential reactions occur,
+                        but can help to visualize systematic lipidomic alterations.
+                        With this option, it can be selected if they should be shown in the network or not.
+                    </li>
+                    <li><b>Correlations/Correlation Changes</b><br>
+                        Check if Correlations/Correlation Changes should be computed. Missing values just skipped.
+                        See node colouring options (Section 3) for a short explanation for how correlation changes are computed and what they mean.
+                        Insignificant correlations (FDR > .05) are automatically set to 0.
+                    </li>
+                    <li><b>Partial-Correlations/-Correlation Changes</b><br>
+                        Check if Partial-Correlations/-Correlation Changes should be computed.
+                        Only possible when there are no missing values.
+                        Partial correlations only consider 'direct' correlation,
+                        i.e. without the effect of all other lipids,
+                        in contrast to 'regular' correlations which also show indirect relations.
+                        See node colouring options (Section 3) for a short explanation
+                        for how partial correlation changes are computed and what they mean.
+                        Insignificant partial correlations (FDR > .05) are automatically set to 0 if p-values
+                        (from Fisher's z-transform) could be computed.
+                        If the sample to feature ratio is too small p-values cannot be computed and you
+                        will be notified by a warning. In this case all partial correlation values
+                        are displayed as they are.
+                    </li>
+                    <li><b>Significance threshold</b><br>
+                        Threshold for which (partial) correlations and statistical tests are shown as significant
+                        (after multiple testing corrections).
+                    </li>
+                    <li><b>Fold Change</b><br>
+                        Check if (log) Fold Changes should be computed.
+                        Fold changes are computed as groupA/groupB or groupA - groupB respectively.
+                        Positive values indicate higher values in the group named at first position!.
+                    </li>
+                    <li><b>Reference Group</b><br>
+                        If you uploaded Sample groups and no Reference Group is chosen all pairwise combinations between sample groups will be calculated.
+                        If there are Sample groups uploaded and a Reference Group is given fold-changes, p-values and (partial) correlation changes are computed against the Reference Group.
+                        If did not upload Sample groups this will have no effect.
+                        Please ensure correct spelling (heading and trailing whitespaces are ignored).
+                    </li>
+                    <li><b>p-values</b><br>
+                        Check if p-values (binary statistical tests) should be computed.
+                        All p-values are automatically FDR correct using the Benjamini-Hochberg procedure.
+                        If the data is approximately normally distributed t-test should be used to get more powerful results.
+                        Otherwise, we recommend using rank-based tests (Wilcoxon rank-sum and Mann-Whitney U rank test).
+                        In the case of paired data, we recommend using Wilcoxon's signed rank test.
+                    </li>
+                    <li><b>Directed Graph</b><br>
+                        Only usable for LINEX version 1.
+                    </li>
+                </ol>
+
+                <h5>1.3. Upload & compute network </h5>
+                <p>
+                    Check if everything is set correctly and press the <b>Upload & Compute Network</b> button.
+                    The computation will start. <br>
+                    If you want to change a Computation options the data has to be uploaded again.<br>
+                    Deleting your browser cookies while using LINEX<sup>2</sup> will also lead to a loss of results,
+                    because your data is matched by an anonymous session id.<br>
+                    <b>NOTE:</b> if you upload a new dataset all prior results will be lost!
+                </p>
+                <img style="border: 4px solid grey;display:block;margin-left:auto;margin-right:auto;border-radius: 10px;"
+                     src="{% static 'images/upload2.png' %}" alt="how it looks like during the network computation" width="500" />
+                <br>
+                When the computation is done a 'View results' button will appear taking you to the analysis page.
+                <br>
+                <br>
+
+                <h3><i class="fa fa-project-diagram fa-fw" aria-hidden="true"></i>&nbsp;2. Analysis </h3>
+
+                <p>
+                    The Analysis page consists of three views, which can be accessed at the top (See image below).
+                    The Network (A), Network Enrichment (B) and Lipidome summary (C).
+                    All views offer different analysis and visualization options.
+                </p>
+                <h5>A. Network view</h5>
+                <img style="border: 4px solid grey;display:block;margin-left:auto;margin-right:auto;border-radius:10px;background-color:white;"
+                     src="{% static 'images/l2_network.png' %}"
+                     alt="Analysis page with network view." width="800" />
+                <br>
+                <p>
+                    The network view shows the interactive lipid-metabolic network with various visualization parameters:
+                </p>
+                <ol type="1">
+                    <li><b>Network type</b><br>
+                        Toggle between network types.
+                        The lipid network can be shown with enzymatic reactions as additional nodes and
+                        lipids can be shown as potential molecular species if only sum species were uploaded.
+                        Switching between network visualizations can take several minutes. Please be patient.
+                    </li>
+                    <li><b>Node colors</b><br>
+                        Different options to color lipids in the networks. These include lipid class,
+                        number of double bonds or fold changes
+                        (For this group comparisons can be selected in the field "Comparison").
+                        Fold changes are computed a groupA/groupB (or groupA - groupB if log-transformed/log-ratios).
+                        If the selected comparison is groupA_groupB positive (log) fold-changes indicate higher values in groupA.
+                    </li>
+                    <li><b>Edge colors</b><br>
+                        Coloring of network edges.
+                        Examples for options are changes in correlations, reaction type and correlations.
+                        <br>
+                        Note:
+                        <ul>
+                            <li>Only significant correlations are shown</li>
+                            <li>
+                                Meaning of (partial) correlation changes:
+                                <ul>
+                                    <li> negative to positive: significant correlation in both groups, <0 in groupA and >0 groupB </li>
+                                    <li> positive to negative: significant correlation in both groups, >0 in groupA and <0 groupB  </li>
+                                    <li> significant to insignificant: significant correlation in groupA, insignificant in groupB </li>
+                                    <li> unchanged significant: significant in both groups, either both >0 or both <0 </li>
+                                    <li> insignificant: insignificant correlation, i.e. uncorrelated, in both groups </li>
+                                    <li> insignificant to significant: insignificant in groupA, significant in groupB </li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </li>
+                    <li><b>Node sizes</b><br>
+                        Node sizes can be adapted to visualize e.g. fold change, chain length or node degree.
+                    </li>
+                    <li><b>Comparison</b><br>
+                        For visualizations of statistical properties such as fold change or significance,
+                        uploaded sample groups are required.
+                        In this field comparisons between groups can be selected.
+                        E.g. case vs. control
+                    </li>
+                    <li><b>Group</b><br>
+                        If values of correlation are visualized one experimental condition has to be selected.
+                        This can be done in this selection field.
+                    </li>
+                    <li><b>Find Lipid Species</b><br>
+                        Find lipids in the network by full name.
+                    </li>
+                    <li><b>Find by substring</b><br>
+                        Find lipids in the network by substring. You can search e.g. for specific fatty acids.
+                    </li>
+                    <li><b>Shown reaction types.</b><br>
+                        LINEX<sup>2</sup> differentiates between class and fatty acid reactions
+                        For detailed information, please consult the paper of LINEX version 2
+                        (Link to publication here: <a href="{% url 'about' %}"><i class="fa fa-info-circle fa-fw" aria-hidden="true"></i>&nbsp;About</a>).
+                        Class reactions come from the reaction databases,
+                        whereas fatty acid reactions are user defined in the "fatty acid settings" file.
+                        It can be toggled which reactions are shown.
+                    </li>
+                    <li><b>Significance threshold</b><br>
+                        Set a significance threshold for group comparisons.
+                        Significant nodes are colored with an additional colored border
+                        (See next point).
+                    </li>
+                    <li><b>Highlight</b><br>
+                        Highlight significant nodes with an additional colored border.
+                    </li>
+                    <li><b>Enable physics</b><br>
+                        Enable physics in the network.
+                        This starts a physics simulation, so the network will adapt to dragging of nodes or
+                        when the network type is changed.
+                    </li>
+                    <li><b>Unified scale</b><br>
+                        Use a unified scale for coloring/sizes when switching between groups and comparisons.
+                    </li>
+                    <li><b>Download view</b><br>
+                        Download the current network view as pdf.
+                        This is preferred for publications, because the network is saved as a vector graphics.
+                    </li>
+                </ol>
+                <h6>Additional Features</h6>
+                <p>
+                    By clicking on nodes or edges in the colour legend all unselected edge/node types will turn grey in the network.
+                    Multiple selection by holding ctrl while selecting is possible. To restore all colours simply click on a non-populated spot inside the colour legend area.<br>
+                    The size legend will be scaled according to the network zoom (i.e. re-scaled every time the network is zoomed in or out).
+                    For better readability it is also possible to zoom the size legend individually.<br>
+                    Zooming via mouse scroll and moving nodes with the cursor is supported for both the network and legend elements.
+                    Additional information can be viewed by hovering over edges and nodes.
+                    The current network view can also be downloaded as a pdf file.
+                </p>
+                <h5>B. Network enrichment view</h5>
+                <img style="border: 4px solid grey;display:block;margin-left:auto;margin-right:auto;border-radius:10px;background-color:white;"
+                     src="{% static 'images/l2_enrichment.png' %}"
+                     alt="Analysis page with network enrichment view." width="800" />
+                <br>
+
+                <p>
+                    A new feature of LINEX<sup>2</sup> is the novel network enrichment algorithm
+                    For details, please read the LINEX<sup>2</sup> manuscript
+                    (Link to publication here: <a href="{% url 'about' %}"><i class="fa fa-info-circle fa-fw" aria-hidden="true"></i>&nbsp;About</a>).
+                    The algorithm is meant to generate hypothesis for enzymatic dysregulation from
+                    lipidomics data between two experimental conditions.
+                    To execute the algorithm, two experimental conditions have to be selected.
+                    The enrichment can be based on substrate-product ratios or differences.
+                    This will either emphasize relative or absolute differences.
+                    The computation is only rerun on the server if parameters are changed.
+                    If the enrichment should be repeated for the same scenario with the same parameters
+                    "Force overwrite" has to be checked.
+                    The results for different comparisons appear in different tabs of the main window.
+                    An successful enrichment shows the resulting subnetwork with an empirical p-value and
+                    the score development of the algorithm. The network can be downloaded as a pdf file by clicking on
+                    "Download view".
+                    For the currently shown network a target list for the
+                    <a href="https://lipidontology.com/">LION enrichment</a> can be downloaded.
+                </p>
+
+                <h5>C. Lipidome summary view</h5>
+                <img style="border: 4px solid grey;display:block;margin-left:auto;margin-right:auto;border-radius:10px;background-color:white;"
+                     src="{% static 'images/l2_summary.png' %}"
+                     alt="Analysis page with lipidome summary view." width="800" />
+                <br>
+                <p>
+                    The lipidome summary view provides a general overview of the lipidome.
+                    Metabolic reactions as in the network views are not considered.
+                    The view consists of three tabs that show visualize different statistical properties:
+                </p>
+                    <ol type="I">
+                        <li><b>Lipidome overview:</b><br>
+                            Plots of lipidome class composition between experimental conditions, chain length and
+                            double bond abundances per lipid class.
+                            All plots are interactive. Selections can be done, zoomed, and downloads can be made.
+                        </li>
+                        <li><b>Substructure analysis:</b><br>
+                            By taking the abundances of combined lipid substructures (also called moieties),
+                            changes of the lipidome can reveal connections e.g.
+                            between lipid classes and certain chain lengths.
+                            This approach is inspired by the work on glycans by
+                            <a href="https://doi.org/10.1038/s41467-021-25183-5">Bao et al.</a>.
+                            For details, please read the LINEX 2 manuscript
+                            (Link to publication here: <a href="{% url 'about' %}"><i class="fa fa-info-circle fa-fw" aria-hidden="true"></i>&nbsp;About</a>).
+                            Lipid substructure abundances are visualized as heatmaps and PCA plots.
+                            The best substructure features to separate experimental groups can be selected.
+                        </li>
+                        <li><b>Chain length analysis:</b><br>
+                            Lipid chain length analysis as published by
+                            <a href="https://doi.org/10.1021/acs.jproteome.0c00082">Mohamed et al.</a>.
+                            Calculates fold changes for each chain length of a lipid class between
+                            two experimental conditions.
+                            This can reveal systematic changes of lipid classes towards longer or shorter chains
+                            between conditions.
+                        </li>
+                    </ol>
+
+
+                <h3><i class="fa fa-download fa-fw" aria-hidden="true"></i>&nbsp;3. Download </h3>
+                Choose the desired files to download <br>
+                <img style="border: 4px solid grey;display:block;margin-left:auto;margin-right:auto;border-radius: 10px;" src="{% static 'images/download.png' %}" alt="Download page" width="500" />
+                <br>
+                <br>
+                <h5>3.1 Network related files</h5>
+                <p> The network can be downloaded as .html file or as .graphml. <br>
+                    The standalone html file can be opened in a browser (locally) and resembles the analysis page with all interactive functions.<br>
+                    Graphml is a general graph storage format. It can be used to import the network into graph tools like Cytoscape in order to generate publication ready plots.<br>
+                    By downloading colour and size legend data the same tools can also be used to create the corresponding legends in a suitable format.<br>
+                    To show the lipid class connections used in your session you can download the corresponding graph as a png image or as a graphml file.
+                </p>
+                <h5>3.2 LipidLynxX related files</h5>
+                <p>
+                    LipidLynxX Converted Data along with a list of incorrectly annotated species names can only be downloaded if the conversion options was checked on the upload page.
+                </p>
+                <h5>3.3 Statistical Metrics</h5>
+                <p>
+                    All computed statistics (as defined on the upload page) can be downloaded as csv files. If sample groups were given one file for each group (or comparison) will be provided.<br>
+                    For (partial) correlations the full correlation matrix is returned, thus also including values for lipid pairs with no (direct) connection in the network.
+                </p>
+                <h5>3.4 Download pdf-view from JSON</h5>
+
+                <img style="border: 4px solid grey;display:block;margin-left:auto;margin-right:auto;border-radius: 10px;"
+                     src="{% static 'images/download_json.png' %}"
+                     alt="Download pdf from JSON" width="500" />
+                <br>
+                <p>
+                    After downloading the standalone html file, the network can be interactively used locally.
+                    If high-quality pdf figures of network views should be generated,
+                    a JSON file can be generated from the standalone pdf file.
+                    These files can be uploaded here and will be converted into a pdf that can be used
+                    e.g. in publications.
+                </p>
+                <h3><i class="fa fa-trash-alt fa-fw" aria-hidden="true"></i>&nbsp;4. Delete Data </h3>
+            <p> Data is saved on the server for {{ timeout }} minutes after upload and will automatically be deleted afterwards, but it can be deleted manually <a href="request-data-delete">here</a> as well.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
