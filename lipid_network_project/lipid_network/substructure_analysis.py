@@ -94,7 +94,7 @@ def add_summary_plots(
     return summary.data
 
 
-def plotly_clustermap(data: pd.DataFrame, labels: pd.Series) -> dict:
+def plotly_clustermap(data: pd.DataFrame, labels: pd.Series) -> go.Figure:
     scaled_data = pd.DataFrame(
         ((data.values.T - np.nanmean(data, axis=1)) / np.nanstd(data, axis=1)).T,
         index=data.index, columns=data.columns
@@ -180,32 +180,54 @@ def plotly_clustermap(data: pd.DataFrame, labels: pd.Series) -> dict:
                               'zeroline': False,
                               'showticklabels': False,
                               'ticks': ""})
-    return fig.to_plotly_json()
+    return fig
 
 
-def _heatmap_to_json_(figure: dict, as_string: bool = False) -> Union[dict, str]:
-    for i, trace in enumerate(figure['data']):
-        if trace['type'] == 'scatter':
-            for arr in ['x', 'y']:
-                if isinstance(trace[arr], np.ndarray):
-                    if trace[arr].ndim == 1:
-                        trace[arr] = list(trace[arr])
-                    else:
-                        # NOTE: this assumes that ndim > 2 is not occuring
-                        trace[arr] = [list(trace[arr][i, :])
-                                      for i in range(trace[arr].shape[0] - 1, -1, -1)]
-            figure['data'][i] = trace
+def _trace_axis_to_list(trace_ax) -> list:
+    if isinstance(trace_ax, list):
+        return trace_ax
+    elif isinstance(trace_ax, np.ndarray):
+        if trace_ax.ndim == 1:
+            return list(trace_ax)
+        else:
+            return [list(trace_ax[i, :])
+                    for i in range(trace_ax.shape[0] - 1, -1, -1)]
+    elif isinstance(trace_ax, tuple):
+        return list(trace_ax)
+    else:
+        raise ValueError(
+            "_trace_axis_to_list only supports lists and numpy arrays"
+            " This is an internal error, "
+            "please report to the developers on GitHub "
+            "(https://github.com/LipiTUM/linex/issues/)."
+        )
+
+
+def _heatmap_to_json_(figure: go.Figure, as_string: bool = False) -> dict:
+    traces_reformat = []
+    for trace in figure['data']:
         if trace['type'] == 'heatmap':
-            if not isinstance(trace['z'], list):
-                trace['z'] = [list(trace['z'][i, :])
-                              for i in range(trace['z'].shape[0] - 1, -1, -1)]
-            if not isinstance(trace['x'], list):
-                trace['x'] = list(trace['x'])
-            if not isinstance(trace['y'], list):
-                trace['y'] = list(trace['y'])
+            trace['z'] = _trace_axis_to_list(trace['z'])
+        traces_reformat.append(trace)
+    figure['data'] = tuple(traces_reformat)
+
+    figure = figure.to_plotly_json()
+    for i, trace in enumerate(figure['data']):
+        if trace['type'] in {'scatter', 'heatmap'}:
+            for arr in ['x', 'y']:
+                trace[arr] = _trace_axis_to_list(trace[arr])
             figure['data'][i] = trace
+        else:
+            raise NotImplementedError(
+                "_heatmap_to_json_ does not support trace type "
+                f"{trace['type']}. This is an internal error, "
+                "please report to the developers on GitHub "
+                "(https://github.com/LipiTUM/linex/issues/)."
+            )
+
     figure['layout'].pop('height', '')
     figure['layout'].pop('width', '')
+
     if as_string:
         return {
             'data': to_json_series(figure['data']),
