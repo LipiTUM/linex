@@ -1,4 +1,4 @@
-FROM python:3.8
+FROM python:3.9
 
 RUN mkdir /webapp
 COPY . /webapp
@@ -13,11 +13,11 @@ RUN apt-get install zip
 
 # Lynx
 RUN git clone https://github.com/SysMedOs/LipidLynxX.git
-RUN cp -r LipidLynxX/lynx/ /usr/local/lib/python3.8/site-packages/
+RUN cp -r LipidLynxX/lynx/ /usr/local/lib/python3.9/site-packages/
 
 WORKDIR /webapp
 
-RUN pip3 install --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir -r requirements-versioned.txt
 
 WORKDIR /webapp/lipid_network_project
 
