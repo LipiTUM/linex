@@ -20,7 +20,7 @@ DATABASES = {
 }
 
 DEBUG = False
-ALLOWED_HOSTS = ['0.0.0.0', '127.0.0.1', 'exbio.wzw.tum.de']
+ALLOWED_HOSTS = ['0.0.0.0', '127.0.0.1', '.ciobio.io']
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.1/howto/static-files/
