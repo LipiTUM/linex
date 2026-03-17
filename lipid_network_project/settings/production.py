@@ -19,8 +19,10 @@ DATABASES = {
     }
 }
 
+FORCE_SCRIPT_NAME = os.environ.get('SCRIPT_NAME', '')
+
 DEBUG = False
-ALLOWED_HOSTS = ['0.0.0.0', '127.0.0.1', '.ciobio.io']
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost 127.0.0.1').split(' ')
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.1/howto/static-files/
@@ -29,13 +31,11 @@ STATICFILES_DIRS = [STATIC_DIR, ]
 STATIC_ROOT = os.path.join(BASE_DIR, 'run_static')
 MEDIA_ROOT = MEDIA_DIR
 
-MEDIA_URL = f'/linex/media/'
-STATIC_URL = f'/linex/static/'
+MEDIA_URL = '/media/'
+STATIC_URL = '/static/'
 
-
-if os.environ.get("HTTPS", False):
-    SESSION_COOKIE_PATH = f'{ROOT_DOMAIN}/'
-    CSRF_COOKIE_PATH = f'{ROOT_DOMAIN}/'
+SESSION_COOKIE_PATH = '/'
+CSRF_COOKIE_PATH = '/'
 CSRF_COOKIE_SESSION = True
 SESSION_COOKIE_SECURE = True
 
