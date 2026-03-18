@@ -1,5 +1,3 @@
-version: "3.5"
-
 services:
   db:
     image: postgres
@@ -22,8 +20,8 @@ services:
       - POSTGRES_DB=${DB}
       - POSTGRES_USER=${DB_USER}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
-      - HTTPS=${HTTPS}
-      - ROOT_DOMAIN=${ROOT_DOMAIN}
+      - SCRIPT_NAME=${SCRIPT_NAME}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
     volumes:
       - static_volume:/webapp/lipid_network_project/static
       - media_volume:/webapp/lipid_network_project/media
@@ -35,16 +33,13 @@ services:
       - web
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
-      - ./lipid_network_project/static:/data/linex/static
-      - ./lipid_network_project/media:/data/linex/media
+      - static_volume:/data/linex/static
+      - media_volume:/data/linex/media
     networks:
       - linexnet
-    environment:
-      - ROOT_DOMAIN=${ROOT_DOMAIN}
 
 networks:
   linexnet:
-    driver: bridge
 
 volumes:
   static_volume:

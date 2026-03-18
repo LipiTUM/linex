@@ -91,7 +91,7 @@ function plotEnrichment(enrichment) {
                 };
                 infoText.innerHTML = '' +
                     '<i class="fa fa-info-circle fa-fw" aria-hidden="true">' +
-                    '</i>Downloads the network as a .json file, which can be uploaded to <a href="https://exbio.wzw.tum.de/linex/download"' +
+                    '</i>Downloads the network as a .json file, which can be uploaded to <a href="https://linex.ciobio.io/download"' +
 						' target="_blank" rel="noopener noreferrer">https://exbio.wzw.tum.de/download/</a> to generate a pdf view';
             } else {
                 btn.onclick = function () {
