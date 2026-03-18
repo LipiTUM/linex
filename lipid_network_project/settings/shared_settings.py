@@ -33,9 +33,6 @@ else:
         file.write(SECRET_KEY)
 
 
-ROOT_DOMAIN = os.environ.get("ROOT_DOMAIN", "")
-
-
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
