@@ -113,12 +113,11 @@ class NetworkDownload(forms.Form):
     network_html = forms.BooleanField(label="Network as standalone .html",
                                       required=False)
     network_graphml = forms.BooleanField(
-        label="Network as .graphml (currently disabled)",
+        label="Network as .graphml",
         required=False,
         help_text='<b>NOTE:</b> To have all node and edge attributes included '
                   'you need to visit the <a '
                   'href="analysis">Analysis</a> site first. ',
-        disabled=True
     )
     colour_legend = forms.BooleanField(label="Colour Legend as .graphml",
                                        required=False, disabled=False)
